@@ -19,8 +19,12 @@ def get_vector_store(config, store_type="main"):
 
     if vs_config.get("type") == "lancedb":
         lancedb_config = vs_config.get("lancedb", {})
+        # Construct URI relative to output_dir
+        uri_base = config.get("output_dir", ".") # Get output_dir from config
+        uri = os.path.join(uri_base, lancedb_config.get("uri", "lancedb_default"))
+        
         return LanceDBVectorStore(
-            uri=lancedb_config.get("uri", "./lancedb"),
+            uri=uri,
             table_name=lancedb_config.get("table_name", "vectors"),
             mode="overwrite", # Consider changing to "append" if you want to add to existing table
         )

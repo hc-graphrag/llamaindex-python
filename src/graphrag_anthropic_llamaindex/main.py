@@ -36,9 +36,8 @@ def main():
     model_name = anthropic_config.get("model", "claude-3-opus-20240229")
     api_base_url = anthropic_config.get("api_base_url")
 
-    data_dir = config.get("data", {}).get("directory", "data")
-    storage_dir = config.get("storage", {}).get("directory", "storage")
-    data_storage_root_dir = config.get("data_storage_root", "./graphrag_data")
+    input_dir = config.get("input_dir", "./data")
+    output_dir = config.get("output_dir", "./graphrag_output")
 
     main_vector_store = get_vector_store(config, store_type="main")
     entity_vector_store = get_vector_store(config, store_type="entity")
@@ -73,11 +72,11 @@ def main():
     community_detection_config = config.get("community_detection", {})
 
     if args.command == "add":
-        add_documents(data_dir, storage_dir, main_vector_store, data_storage_root_dir,
+        add_documents(input_dir, output_dir, main_vector_store,
                       entity_vector_store,
                       community_vector_store, service_context, community_detection_config)
     elif args.command == "search":
-        search_index(args.query, storage_dir, llm_params, main_vector_store,
+        search_index(args.query, output_dir, llm_params, main_vector_store,
                      entity_vector_store, community_vector_store, service_context, args.target_index)
 
 if __name__ == "__main__":

@@ -23,19 +23,18 @@ from graphrag_anthropic_llamaindex.graph_operations import cluster_graph
 from graphrag_anthropic_llamaindex.llm_utils import parse_llm_json_output, extraction_prompt_template, summary_prompt_template
 
 def add_documents(
-    data_dir,
-    storage_dir,
+    input_dir,
+    output_dir,
     vector_store=None,
-    data_storage_root_dir=None, # Changed from processed_files_db_dir, entity_db_dir, etc.
     entity_vector_store=None,
     community_vector_store=None,
     service_context=None,
     community_detection_config=None,
 ):
     """Adds documents from the data directory to the index."""
-    print(f"Adding documents from '{data_dir}'...")
+    print(f"Adding documents from '{input_dir}'...")
     try:
-        processed_files_df = load_processed_files_db(data_storage_root_dir)
+        processed_files_df = load_processed_files_db(output_dir)
         processed_hashes = set(processed_files_df['hash'].tolist())
         newly_processed_files = []
 
@@ -43,7 +42,7 @@ def add_documents(
 
         # Get all files in the data directory, including subdirectories
         all_file_paths = []
-        for root, _, files in os.walk(data_dir):
+        for root, _, files in os.walk(input_dir):
             for file in files:
                 all_file_paths.append(os.path.join(root, file))
 
@@ -125,17 +124,17 @@ def add_documents(
         # Save extracted entities and relationships to Parquet
         if extracted_entities_list:
             new_entities_df = pd.DataFrame(extracted_entities_list)
-            existing_entities_df = load_entities_db(data_storage_root_dir)
+            existing_entities_df = load_entities_db(output_dir)
             updated_entities_df = pd.concat([existing_entities_df, new_entities_df], ignore_index=True).drop_duplicates(subset=['name', 'type'])
-            save_entities_db(updated_entities_df, data_storage_root_dir)
-            print(f"Saved {len(new_entities_df)} new entities to {data_storage_root_dir}/entities.parquet")
+            save_entities_db(updated_entities_df, output_dir)
+            print(f"Saved {len(new_entities_df)} new entities to {output_dir}/entities.parquet")
 
         if extracted_relationships_list:
             new_relationships_df = pd.DataFrame(extracted_relationships_list)
-            existing_relationships_df = load_relationships_db(data_storage_root_dir)
+            existing_relationships_df = load_relationships_db(output_dir)
             updated_relationships_df = pd.concat([existing_relationships_df, new_relationships_df], ignore_index=True).drop_duplicates()
-            save_relationships_db(updated_relationships_df, data_storage_root_dir)
-            print(f"Saved {len(new_relationships_df)} new relationships to {data_storage_root_dir}/relationships.parquet")
+            save_relationships_db(updated_relationships_df, output_dir)
+            print(f"Saved {len(new_relationships_df)} new relationships to {output_dir}/relationships.parquet")
 
         # --- Community Detection ---
         if extracted_relationships_list and community_detection_config:
@@ -152,10 +151,10 @@ def add_documents(
             
             if communities:
                 new_communities_df = pd.DataFrame(communities, columns=['level', 'cluster_id', 'parent_cluster', 'nodes'])
-                existing_communities_df = load_community_db(data_storage_root_dir)
+                existing_communities_df = load_community_db(output_dir)
                 updated_communities_df = pd.concat([existing_communities_df, new_communities_df], ignore_index=True).drop_duplicates(subset=['level', 'cluster_id'])
-                save_community_db(updated_communities_df, data_storage_root_dir)
-                print(f"Saved {len(new_communities_df)} new communities to {data_storage_root_dir}/communities.parquet")
+                save_community_db(updated_communities_df, output_dir)
+                print(f"Saved {len(new_communities_df)} new communities to {output_dir}/communities.parquet")
 
                 # --- Community Summarization ---
                 print("Generating community summaries...")
@@ -199,10 +198,10 @@ def add_documents(
             
                 if extracted_community_summaries:
                     new_summaries_df = pd.DataFrame(extracted_community_summaries)
-                    existing_summaries_df = load_community_summaries_db(data_storage_root_dir)
+                    existing_summaries_df = load_community_summaries_db(output_dir)
                     updated_summaries_df = pd.concat([existing_summaries_df, new_summaries_df], ignore_index=True).drop_duplicates(subset=['community_id'])
-                    save_community_summaries_db(updated_summaries_df, data_storage_root_dir)
-                    print(f"Saved {len(new_summaries_df)} new community summaries to {data_storage_root_dir}/community_summaries.parquet")
+                    save_community_summaries_db(updated_summaries_df, output_dir)
+                    print(f"Saved {len(new_summaries_df)} new community summaries to {output_dir}/community_summaries.parquet")
 
                 # Create/Update community summary vector index
                 if community_summary_documents:
@@ -210,7 +209,7 @@ def add_documents(
                         community_storage_context = StorageContext.from_defaults(vector_store=community_vector_store)
                         community_index = VectorStoreIndex(community_summary_documents, storage_context=community_storage_context, service_context=service_context)
                     else:
-                        community_index_dir = os.path.join(storage_dir, "community_summaries_index")
+                        community_index_dir = os.path.join(output_dir, "community_summaries_index")
                         os.makedirs(community_index_dir, exist_ok=True)
                         community_index = VectorStoreIndex(community_summary_documents, service_context=service_context)
                         community_index.storage_context.persist(persist_dir=community_index_dir)
@@ -228,7 +227,7 @@ def add_documents(
             index = VectorStoreIndex(nodes, storage_context=storage_context, service_context=service_context)
         else:
             index = VectorStoreIndex(nodes, service_context=service_context)
-            index.storage_context.persist(persist_dir=storage_dir)
+            index.storage_context.persist(persist_dir=output_dir)
         print("Main text index updated.")
 
         # Create/Update entity vector index
@@ -238,7 +237,7 @@ def add_documents(
                 entity_index = VectorStoreIndex(entity_documents, storage_context=entity_storage_context, service_context=service_context)
             else:
                 # If no specific entity_vector_store, use default storage for entities
-                entity_index_dir = os.path.join(storage_dir, "entities_index")
+                entity_index_dir = os.path.join(output_dir, "entities_index")
                 os.makedirs(entity_index_dir, exist_ok=True)
                 entity_index = VectorStoreIndex(entity_documents, service_context=service_context)
                 entity_index.storage_context.persist(persist_dir=entity_index_dir)
@@ -248,7 +247,7 @@ def add_documents(
 
         # Update and save the processed files database
         updated_df = pd.concat([processed_files_df, pd.DataFrame(newly_processed_files)], ignore_index=True)
-        save_processed_files_db(updated_df, data_storage_root_dir)
+        save_processed_files_db(updated_df, output_dir)
 
         print("Documents and entities processed successfully.")
     except Exception as e:

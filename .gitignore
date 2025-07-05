@@ -13,3 +13,4 @@ poetry.lock
 .pypoetry.cfg
 
 data
+graphrag_output

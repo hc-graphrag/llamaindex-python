@@ -3,7 +3,7 @@ from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_s
 
 from graphrag_anthropic_llamaindex.vector_store_manager import get_index
 
-def search_index(query, storage_dir, llm_params, vector_store=None, entity_vector_store=None, community_vector_store=None, service_context=None, target_index="both", data_storage_root_dir=None):
+def search_index(query, output_dir, llm_params, vector_store=None, entity_vector_store=None, community_vector_store=None, service_context=None, target_index="both"):
     """Searches the main text index and optionally the entity index with a given query."""
     main_index = None
     entity_index = None
@@ -14,7 +14,7 @@ def search_index(query, storage_dir, llm_params, vector_store=None, entity_vecto
         if vector_store:
             main_index = VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
         else:
-            main_index = get_index(storage_dir, service_context=service_context, index_type="main")
+            main_index = get_index(os.path.join(output_dir, "storage"), service_context=service_context, index_type="main")
 
         if main_index is None:
             print("Main text index not found. Please add documents first using the 'add' command.")
@@ -26,7 +26,7 @@ def search_index(query, storage_dir, llm_params, vector_store=None, entity_vecto
         if entity_vector_store:
             entity_index = VectorStoreIndex.from_vector_store(entity_vector_store, service_context=service_context)
         else:
-            entity_index_dir = os.path.join(storage_dir, "entities_index")
+            entity_index_dir = os.path.join(output_dir, "entities_index")
             if os.path.exists(entity_index_dir):
                 entity_storage_context = StorageContext.from_defaults(persist_dir=entity_index_dir)
                 entity_index = load_index_from_storage(entity_storage_context, service_context=service_context)
@@ -41,7 +41,7 @@ def search_index(query, storage_dir, llm_params, vector_store=None, entity_vecto
         if community_vector_store:
             community_index = VectorStoreIndex.from_vector_store(community_vector_store, service_context=service_context)
         else:
-            community_index_dir = os.path.join(storage_dir, "community_summaries_index")
+            community_index_dir = os.path.join(output_dir, "community_summaries_index")
             if os.path.exists(community_index_dir):
                 community_storage_context = StorageContext.from_defaults(persist_dir=community_index_dir)
                 community_index = load_index_from_storage(community_storage_context, service_context=service_context)

@@ -2,7 +2,7 @@
 
 anthropic:
   api_key: "YOUR_ANTHROPIC_API_KEY"
-  model: "claude-3-opus-20240229"
+  model: "claude-3-opus-20240620"
   # api_base_url: "https://api.anthropic.com"
 
 embedding_model:
@@ -12,27 +12,28 @@ chunking:
   chunk_size: 1024
   chunk_overlap: 20
 
-data:
-  directory: "data"
-
-storage:
-  directory: "storage"
+input_dir: "./data"
+output_dir: "./graphrag_output"
 
 vector_store:
   type: "lancedb" # or "default"
   lancedb:
-    uri: "./lancedb"
+    uri: "./graphrag_output/lancedb_main"
     table_name: "vectors"
 
 community_vector_store:
   type: "lancedb" # or "default"
   lancedb:
-    uri: "./lancedb_communities"
+    uri: "./graphrag_output/lancedb_communities"
     table_name: "community_vectors"
+
+entity_vector_store:
+  type: "lancedb" # or "default"
+  lancedb:
+    uri: "./graphrag_output/lancedb_entities"
+    table_name: "entities_vectors"
 
 community_detection:
   max_cluster_size: 10
   use_lcc: True
   seed: 42
-
-data_storage_root: "./graphrag_data"
