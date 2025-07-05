@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+config.yaml
+
+# Poetry
+poetry.lock
+.pypoetry.cfg
+
+data

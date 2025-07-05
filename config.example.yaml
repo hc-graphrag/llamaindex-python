@@ -1,0 +1,38 @@
+# Configuration for graphrag-anthropic-llamaindex
+
+anthropic:
+  api_key: "YOUR_ANTHROPIC_API_KEY"
+  model: "claude-3-opus-20240229"
+  # api_base_url: "https://api.anthropic.com"
+
+embedding_model:
+  name: "intfloat/multilingual-e5-small"
+
+chunking:
+  chunk_size: 1024
+  chunk_overlap: 20
+
+data:
+  directory: "data"
+
+storage:
+  directory: "storage"
+
+vector_store:
+  type: "lancedb" # or "default"
+  lancedb:
+    uri: "./lancedb"
+    table_name: "vectors"
+
+community_vector_store:
+  type: "lancedb" # or "default"
+  lancedb:
+    uri: "./lancedb_communities"
+    table_name: "community_vectors"
+
+community_detection:
+  max_cluster_size: 10
+  use_lcc: True
+  seed: 42
+
+data_storage_root: "./graphrag_data"
