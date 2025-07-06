@@ -44,31 +44,49 @@ def _get_full_llm_response_with_continuation(original_prompt, max_continuation_a
                 break
         return s1 + s2[max_overlap:]
 
-    # Initial call
-    response = Settings.llm.complete(original_prompt)
-    full_response_text = response.text
-    
-    # Check for truncation using response.raw['stop_reason']
-    is_truncated = response.raw.get("stop_reason") == "max_tokens"
+    full_response_text = ""
     attempts = 0
+    json_parse_successful = False
 
-    while is_truncated and attempts < max_continuation_attempts:
+    while attempts < max_continuation_attempts and not json_parse_successful:
         attempts += 1
-        # Construct the continuation prompt: original prompt + current full response + continuation instruction
-        continuation_prompt = (
-            f"{original_prompt}\n\n"
-            f"これまでの応答はトークン制限により途中で終了しました。続きを生成してください。\n"
-            f"これまでの応答:\n```\n{full_response_text}\n```\n"
-            f"続きを生成してください。"
-        )
-        response = Settings.llm.complete(continuation_prompt)
+        current_prompt = original_prompt
+        if attempts > 1:
+            # Construct the continuation prompt: original prompt + current full response + continuation instruction
+            current_prompt = (
+                f"{original_prompt}\n\n"
+                f"これまでの応答はトークン制限により途中で終了しました。続きを生成してください。\n"
+                f"これまでの応答:\n```\n{full_response_text}\n```\n"
+                f"続きを生成してください。"
+            )
+        
+        response = Settings.llm.complete(current_prompt)
         next_part = response.text
         
         full_response_text = _stitch_responses(full_response_text, next_part)
         
-        is_truncated = response.raw.get("stop_reason") == "max_tokens"
-    
-    if attempts >= max_continuation_attempts:
+        # Check if the current full_response_text is valid JSON
+        parsed_json = parse_llm_json_output(full_response_text)
+        json_parse_successful = (parsed_json is not None)
+        
+        # Also check for explicit truncation reason from LLM
+        is_explicitly_truncated = response.raw.get("stop_reason") == "max_tokens"
+        
+        # If JSON parsing failed AND it's not explicitly truncated, it means the LLM stopped for another reason
+        # or produced malformed JSON. We continue if it's explicitly truncated OR if JSON parsing failed.
+        if not json_parse_successful and not is_explicitly_truncated:
+            # If JSON parsing failed but LLM didn't say max_tokens, it might be a malformed JSON issue
+            # that continuation won't fix, or a different stop reason. For now, we'll assume it needs continuation.
+            # However, to prevent infinite loops on consistently malformed JSON, max_attempts is crucial.
+            pass # The loop condition already handles attempts < max_continuation_attempts
+        
+        # The loop continues if JSON is not successful OR if it was explicitly truncated
+        # and we haven't reached max attempts.
+        # The condition `not json_parse_successful` is the primary driver for continuation now.
+
+    if not json_parse_successful:
+        print(f"Warning: JSON parsing failed after {attempts} attempts. Response might be incomplete or malformed.")
+    elif attempts >= max_continuation_attempts:
         print(f"Warning: Max continuation attempts ({max_continuation_attempts}) reached. Response might be incomplete.")
 
     return full_response_text
