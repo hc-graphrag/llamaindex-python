@@ -63,7 +63,6 @@ def main():
     Settings.llm = llm
     Settings.embed_model = embed_model
     Settings.node_parser = node_parser
-    Settings.tokenizer = llm.tokenizer
 
     community_detection_config = config.get("community_detection", {})
 

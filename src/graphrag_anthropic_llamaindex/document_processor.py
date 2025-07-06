@@ -22,6 +22,52 @@ from graphrag_anthropic_llamaindex.db_manager import (
 from graphrag_anthropic_llamaindex.graph_operations import cluster_graph
 from graphrag_anthropic_llamaindex.llm_utils import parse_llm_json_output, extraction_prompt_template, summary_prompt_template
 
+def _get_full_llm_response_with_continuation(original_prompt):
+    """
+    Handles LLM calls with continuation logic for token limits.
+    It repeatedly calls the LLM with a continuation prompt that includes the original prompt
+    and the already generated partial response, stitching the parts together while removing overlaps.
+    """
+    
+    def _stitch_responses(s1, s2):
+        if not s1:
+            return s2
+        if not s2:
+            return s1
+        # Match up to 200 characters from the end of s1 with the start of s2
+        search_window = 200
+        max_overlap = 0
+        for k in range(min(len(s1), len(s2), search_window), 0, -1):
+            if s1.endswith(s2[:k]):
+                max_overlap = k
+                break
+        return s1 + s2[max_overlap:]
+
+    # Initial call
+    response = Settings.llm.complete(original_prompt)
+    full_response_text = response.text
+    
+    # Check for truncation. For Anthropic models, the stop_reason is 'max_tokens'.
+    # If additional_kwargs is empty, we assume truncation if JSON parsing fails later.
+    is_truncated = response.additional_kwargs.get("stop_reason") == "max_tokens"
+
+    while is_truncated:
+        # Construct the continuation prompt: original prompt + current full response + continuation instruction
+        continuation_prompt = (
+            f"{original_prompt}\n\n"
+            f"これまでの応答はトークン制限により途中で終了しました。続きを生成してください。\n"
+            f"これまでの応答:\n```\n{full_response_text}\n```\n"
+            f"続きを生成してください。"
+        )
+        response = Settings.llm.complete(continuation_prompt)
+        next_part = response.text
+        
+        full_response_text = _stitch_responses(full_response_text, next_part)
+        
+        is_truncated = response.additional_kwargs.get("stop_reason") == "max_tokens"
+
+    return full_response_text
+
 def add_documents(
     input_dir,
     output_dir,
@@ -66,7 +112,8 @@ def add_documents(
         # Process non-CSV files using UnstructuredReader
         unstructured_supported_exts = [
             ".txt", ".text", ".eml", ".msg", ".html", ".htm", ".xml", ".json",
-            ".tsv", ".md", ".rst", ".rtf", ".odt", ".doc", ".docx",
+            ".tsv", ".md", 
+            ".rst", ".rtf", ".odt", ".doc", ".docx",
             ".ppt", ".pptx", ".pdf", ".png", ".jpg", ".jpeg", ".heic", ".epub",
         ]
         file_extractor = {ext: UnstructuredReader() for ext in unstructured_supported_exts}
@@ -105,8 +152,7 @@ def add_documents(
         for i, node in enumerate(nodes):
             try:
                 prompt = extraction_prompt_template.format(text=node.text)
-                response = Settings.llm.complete(prompt)
-                json_output = response.text
+                json_output = _get_full_llm_response_with_continuation(prompt)
                 result = parse_llm_json_output(json_output)
                 
                 if result:
@@ -164,8 +210,7 @@ def add_documents(
                 entity_to_node_text = {}
                 for node in nodes:
                     temp_prompt = extraction_prompt_template.format(text=node.text)
-                    temp_response = Settings.llm.complete(temp_prompt)
-                    temp_json_output = temp_response.text
+                    temp_json_output = _get_full_llm_response_with_continuation(temp_prompt)
                     temp_result = parse_llm_json_output(temp_json_output)
                     if temp_result:
                         for entity in temp_result.get('entities', []):
@@ -183,8 +228,7 @@ def add_documents(
                         combined_community_text = " ".join(community_text_parts)
                         try:
                             prompt = summary_prompt_template.format(text=combined_community_text)
-                            response = Settings.llm.complete(prompt)
-                            json_output = response.text
+                            json_output = _get_full_llm_response_with_continuation(prompt)
                             summary_dict = parse_llm_json_output(json_output)
                             
                             if summary_dict:

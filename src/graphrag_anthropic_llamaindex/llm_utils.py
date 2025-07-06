@@ -26,6 +26,7 @@ Extract entities and relationships from the following text.
 Entities should have a 'name' and 'type'.
 Relationships should have 'source', 'target', 'type', and 'description'.
 Output the result as a JSON object with two keys: 'entities' (list of entity objects) and 'relationships' (list of relationship objects).
+IMPORTANT: Only output the JSON object. Do not include any other text or markdown formatting outside the JSON.
 
 Example JSON format:
 ```json
@@ -47,6 +48,7 @@ summary_prompt_template = """
 Summarize the following text, focusing on key entities and their relationships.
 Provide a concise summary and a list of key entities mentioned.
 Output the result as a JSON object with three keys: 'community_id' (integer), 'summary' (string), and 'key_entities' (list of strings).
+IMPORTANT: Only output the JSON object. Do not include any other text or markdown formatting outside the JSON.
 
 Example JSON format:
 ```json
