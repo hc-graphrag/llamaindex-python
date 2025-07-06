@@ -22,11 +22,12 @@ from graphrag_anthropic_llamaindex.db_manager import (
 from graphrag_anthropic_llamaindex.graph_operations import cluster_graph
 from graphrag_anthropic_llamaindex.llm_utils import parse_llm_json_output, extraction_prompt_template, summary_prompt_template
 
-def _get_full_llm_response_with_continuation(original_prompt):
+def _get_full_llm_response_with_continuation(original_prompt, max_continuation_attempts=5):
     """
     Handles LLM calls with continuation logic for token limits.
     It repeatedly calls the LLM with a continuation prompt that includes the original prompt
     and the already generated partial response, stitching the parts together while removing overlaps.
+    Includes a safeguard for infinite loops with max_continuation_attempts.
     """
     
     def _stitch_responses(s1, s2):
@@ -47,11 +48,12 @@ def _get_full_llm_response_with_continuation(original_prompt):
     response = Settings.llm.complete(original_prompt)
     full_response_text = response.text
     
-    # Check for truncation. For Anthropic models, the stop_reason is 'max_tokens'.
-    # If additional_kwargs is empty, we assume truncation if JSON parsing fails later.
-    is_truncated = response.additional_kwargs.get("stop_reason") == "max_tokens"
+    # Check for truncation using response.raw['stop_reason']
+    is_truncated = response.raw.get("stop_reason") == "max_tokens"
+    attempts = 0
 
-    while is_truncated:
+    while is_truncated and attempts < max_continuation_attempts:
+        attempts += 1
         # Construct the continuation prompt: original prompt + current full response + continuation instruction
         continuation_prompt = (
             f"{original_prompt}\n\n"
@@ -64,7 +66,10 @@ def _get_full_llm_response_with_continuation(original_prompt):
         
         full_response_text = _stitch_responses(full_response_text, next_part)
         
-        is_truncated = response.additional_kwargs.get("stop_reason") == "max_tokens"
+        is_truncated = response.raw.get("stop_reason") == "max_tokens"
+    
+    if attempts >= max_continuation_attempts:
+        print(f"Warning: Max continuation attempts ({max_continuation_attempts}) reached. Response might be incomplete.")
 
     return full_response_text
 
