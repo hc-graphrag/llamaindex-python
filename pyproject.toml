@@ -5,24 +5,64 @@ description = "A project to replicate ms-graphrag functionality using LlamaIndex
 authors = ["Your Name <you@example.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.13"
-llama-index = "^0.10.0"
-anthropic = "^0.23.0"
+python = ">=3.9,<3.12"
+llama-index = "^0.12.46"
+anthropic = "^0.57.1"
 pyyaml = "^6.0"
-llama-index-vector-stores-lancedb = "^0.1.2"
+
 beautifulsoup4 = "^4.12.3"
 unstructured = {extras = ["local-inference"], version = "^0.14.0"}
-llama-index-embeddings-huggingface = "^0.2.0"
+
 torch = "^2.3.0"
 pandas = "^2.2.0"
 pyarrow = "^16.0.0"
 fsspec = "^2024.3.0"
 networkx = "^3.2.1"
 graspologic = "^0.3.0"
+cython = "^3.1.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"
 
+
+[tool.pdm]
+distribution = true
+
+[project]
+name = "graphrag-anthropic-llamaindex"
+version = "0.1.0"
+description = "A project to replicate ms-graphrag functionality using LlamaIndex and Anthropic Claude."
+authors = [
+    {name = "asopitech", email = "asopitech.iot.research+github@gmail.com"},
+    {name = "Your Name", email = "you@example.com"},
+]
+dependencies = [
+    "llama-index<1.0.0,>=0.12.46",
+    "anthropic<1.0.0,>=0.57.1",
+    "pyyaml<7.0,>=6.0",
+    "beautifulsoup4<5.0.0,>=4.12.3",
+    "unstructured[local-inference]<1.0.0,>=0.14.0",
+    "torch<3.0.0,>=2.3.0",
+    "pandas<3.0.0,>=2.2.0",
+    "pyarrow<17.0.0,>=16.0.0",
+    "fsspec<2025.0.0,>=2024.3.0",
+    "networkx<4.0.0,>=3.2.1",
+    "graspologic<1.0.0,>=0.3.0",
+    "cython<4.0.0,>=3.1.2",
+    "llama-index-vector-stores-lancedb>=0.3.3",
+    "wheel>=0.45.1",
+    "llama-index-llms-anthropic>=0.7.6",
+]
+requires-python = "<3.12,>=3.9"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[dependency-groups]
+dev = [
+    "pytest<8.0,>=7.0",
+]
+
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
