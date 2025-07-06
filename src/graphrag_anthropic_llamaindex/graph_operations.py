@@ -1,5 +1,5 @@
 import networkx as nx
-from graspologic.partition import hierarchical_leiden
+from cdlib import algorithms
 
 # Adapted from ms-graphrag/graphrag/index/utils/stable_lcc.py
 def stable_largest_connected_component(graph: nx.Graph) -> nx.Graph:
@@ -25,29 +25,24 @@ def _compute_leiden_communities(
     if use_lcc:
         graph = stable_largest_connected_component(graph)
 
-    node_mapping = {node: i for i, node in enumerate(graph.nodes())}
-    reverse_node_mapping = {i: node for node, i in node_mapping.items()}
-    
-    int_graph = nx.Graph()
-    int_graph.add_nodes_from(node_mapping.values())
-    for u, v in graph.edges():
-        int_graph.add_edge(node_mapping[u], node_mapping[v])
+    if len(graph.nodes()) == 0:
+        return {}, {}
 
-    community_mapping = hierarchical_leiden(
-        int_graph, max_cluster_size=max_cluster_size, random_seed=seed
-    )
+    # Use cdlib's leiden algorithm
+    if seed is not None:
+        import random
+        random.seed(seed)
+    communities = algorithms.leiden(graph)
     
-    results: dict[int, dict[str, int]] = {}
+    # Create results mapping
+    results: dict[int, dict[str, int]] = {0: {}}
     hierarchy: dict[int, int] = {}
-    for partition in community_mapping:
-        results[partition.level] = results.get(partition.level, {})
-        original_node_name = reverse_node_mapping[partition.node]
-        results[partition.level][original_node_name] = partition.cluster
-
-        hierarchy[partition.cluster] = (
-            partition.parent_cluster if partition.parent_cluster is not None else -1
-        )
-
+    
+    for i, community in enumerate(communities.communities):
+        hierarchy[i] = -1  # cdlib's leiden doesn't provide hierarchical structure by default
+        for node in community:
+            results[0][str(node)] = i
+    
     return results, hierarchy
 
 # Adapted from ms-graphrag/graphrag/index/operations/cluster_graph.py

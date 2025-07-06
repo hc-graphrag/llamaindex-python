@@ -18,7 +18,8 @@ pandas = "^2.2.0"
 pyarrow = "^16.0.0"
 fsspec = "^2024.3.0"
 networkx = "^3.2.1"
-graspologic = "^0.3.0"
+cdlib = "^0.1.0"
+leidenalg = "^0.8.0"
 cython = "^3.1.2"
 
 [tool.poetry.dev-dependencies]
@@ -47,7 +48,8 @@ dependencies = [
     "pyarrow<17.0.0,>=16.0.0",
     "fsspec<2025.0.0,>=2024.3.0",
     "networkx<4.0.0,>=3.2.1",
-    "graspologic<1.0.0,>=0.3.0",
+    "cdlib<1.0.0,>=0.1.0",
+    "leidenalg<1.0.0,>=0.8.0",
     "cython<4.0.0,>=3.1.2",
     "llama-index-vector-stores-lancedb>=0.3.3",
     "wheel>=0.45.1",
