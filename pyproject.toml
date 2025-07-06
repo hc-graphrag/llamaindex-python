@@ -48,13 +48,11 @@ dependencies = [
     "pyarrow>=20.0.0",
     "fsspec<2025.0.0,>=2024.3.0",
     "networkx<4.0.0,>=3.2.1",
-    "cdlib<1.0.0,>=0.1.0",
-    "leidenalg<1.0.0,>=0.8.0",
-    "cython<4.0.0,>=3.1.2",
     "llama-index-vector-stores-lancedb>=0.3.3",
-    "wheel>=0.45.1",
     "llama-index-llms-anthropic>=0.7.6",
     "llama-index-embeddings-huggingface>=0.5.5",
+    "graspologic>=3.4.1",
+    "future>=1.0.0",
 ]
 requires-python = "<3.12,>=3.9"
 readme = "README.md"

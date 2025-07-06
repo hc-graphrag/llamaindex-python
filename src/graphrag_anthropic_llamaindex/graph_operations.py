@@ -1,5 +1,5 @@
 import networkx as nx
-from cdlib import algorithms
+from graspologic.partition import hierarchical_leiden
 
 # Adapted from ms-graphrag/graphrag/index/utils/stable_lcc.py
 def stable_largest_connected_component(graph: nx.Graph) -> nx.Graph:
@@ -21,7 +21,7 @@ def _compute_leiden_communities(
     use_lcc: bool,
     seed: int | None = None,
 ) -> tuple[dict[int, dict[str, int]], dict[int, int]]:
-    """Return Leiden root communities and their hierarchy mapping."""
+    """Return Leiden hierarchical communities and their hierarchy mapping."""
     if use_lcc:
         graph = stable_largest_connected_component(graph)
 
@@ -41,21 +41,37 @@ def _compute_leiden_communities(
     for edge in graph.edges():
         int_graph.add_edge(node_to_int[edge[0]], node_to_int[edge[1]])
 
-    # Use cdlib's leiden algorithm on the integer graph
-    if seed is not None:
-        import random
-        random.seed(seed)
-    communities = algorithms.leiden(int_graph)
+    # Use graspologic's hierarchical leiden algorithm
+    hierarchical_clusters = hierarchical_leiden(
+        int_graph,
+        max_cluster_size=max_cluster_size,
+        resolution=1.0,
+        randomness=0.001,
+        random_seed=seed
+    )
     
-    # Create results mapping using original node names
-    results: dict[int, dict[str, int]] = {0: {}}
+    # Process hierarchical clustering results
+    results: dict[int, dict[str, int]] = {}
     hierarchy: dict[int, int] = {}
     
-    for i, community in enumerate(communities.communities):
-        hierarchy[i] = -1  # cdlib's leiden doesn't provide hierarchical structure by default
-        for int_node in community:
+    # Process each hierarchical cluster assignment
+    for hcluster in hierarchical_clusters:
+        cluster_level = hcluster.level
+        cluster_id = hcluster.cluster
+        int_node = hcluster.node
+        parent_cluster_id = hcluster.parent_cluster
+        
+        # Initialize level in results if not exists
+        if cluster_level not in results:
+            results[cluster_level] = {}
+        
+        # Map node back to original name and assign to cluster
+        if int_node in int_to_node:
             original_node = int_to_node[int_node]
-            results[0][str(original_node)] = i
+            results[cluster_level][str(original_node)] = cluster_id
+        
+        # Set hierarchy mapping (parent cluster)
+        hierarchy[cluster_id] = parent_cluster_id if parent_cluster_id is not None else -1
     
     return results, hierarchy
 
