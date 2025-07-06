@@ -28,20 +28,34 @@ def _compute_leiden_communities(
     if len(graph.nodes()) == 0:
         return {}, {}
 
-    # Use cdlib's leiden algorithm
+    # Create a mapping from original node names to integers
+    original_nodes = list(graph.nodes())
+    node_to_int = {node: i for i, node in enumerate(original_nodes)}
+    int_to_node = {i: node for i, node in enumerate(original_nodes)}
+    
+    # Create a new graph with integer node names
+    int_graph = nx.Graph()
+    for node in original_nodes:
+        int_graph.add_node(node_to_int[node])
+    
+    for edge in graph.edges():
+        int_graph.add_edge(node_to_int[edge[0]], node_to_int[edge[1]])
+
+    # Use cdlib's leiden algorithm on the integer graph
     if seed is not None:
         import random
         random.seed(seed)
-    communities = algorithms.leiden(graph)
+    communities = algorithms.leiden(int_graph)
     
-    # Create results mapping
+    # Create results mapping using original node names
     results: dict[int, dict[str, int]] = {0: {}}
     hierarchy: dict[int, int] = {}
     
     for i, community in enumerate(communities.communities):
         hierarchy[i] = -1  # cdlib's leiden doesn't provide hierarchical structure by default
-        for node in community:
-            results[0][str(node)] = i
+        for int_node in community:
+            original_node = int_to_node[int_node]
+            results[0][str(original_node)] = i
     
     return results, hierarchy
 

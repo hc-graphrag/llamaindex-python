@@ -30,11 +30,11 @@ def get_vector_store(config, store_type="main"):
         )
     return None # Falls back to default in-memory
 
-def get_index(storage_dir, vector_store=None, service_context=None, index_type="main"):
+def get_index(storage_dir, vector_store=None, index_type="main"):
     """Loads the index from storage if it exists, otherwise creates a new one."""
     if index_type == "main" and vector_store is None and os.path.exists(storage_dir):
         storage_context = StorageContext.from_defaults(persist_dir=storage_dir)
-        return load_index_from_storage(storage_context, service_context=service_context)
+        return load_index_from_storage(storage_context)
     elif vector_store is not None:
-        return VectorStoreIndex.from_vector_store(vector_store, service_context=service_context)
+        return VectorStoreIndex.from_vector_store(vector_store)
     return None

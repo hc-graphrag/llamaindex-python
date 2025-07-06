@@ -22,7 +22,7 @@ cdlib = "^0.1.0"
 leidenalg = "^0.8.0"
 cython = "^3.1.2"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pytest = "^7.0"
 
 
@@ -45,7 +45,7 @@ dependencies = [
     "unstructured[local-inference]<1.0.0,>=0.14.0",
     "torch<3.0.0,>=2.3.0",
     "pandas<3.0.0,>=2.2.0",
-    "pyarrow<17.0.0,>=16.0.0",
+    "pyarrow>=20.0.0",
     "fsspec<2025.0.0,>=2024.3.0",
     "networkx<4.0.0,>=3.2.1",
     "cdlib<1.0.0,>=0.1.0",
@@ -54,6 +54,7 @@ dependencies = [
     "llama-index-vector-stores-lancedb>=0.3.3",
     "wheel>=0.45.1",
     "llama-index-llms-anthropic>=0.7.6",
+    "llama-index-embeddings-huggingface>=0.5.5",
 ]
 requires-python = "<3.12,>=3.9"
 readme = "README.md"

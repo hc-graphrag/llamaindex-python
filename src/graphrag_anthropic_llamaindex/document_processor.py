@@ -3,7 +3,7 @@ import pandas as pd
 import networkx as nx
 import traceback
 from llama_index.core.schema import Document
-from llama_index.core import VectorStoreIndex, StorageContext, SimpleDirectoryReader
+from llama_index.core import VectorStoreIndex, StorageContext, SimpleDirectoryReader, Settings
 from llama_index.readers.file import UnstructuredReader
 
 from graphrag_anthropic_llamaindex.db_manager import (
@@ -28,7 +28,6 @@ def add_documents(
     vector_store=None,
     entity_vector_store=None,
     community_vector_store=None,
-    service_context=None,
     community_detection_config=None,
 ):
     """Adds documents from the data directory to the index."""
@@ -95,7 +94,7 @@ def add_documents(
             all_documents.extend(non_csv_documents)
 
         # Chunk documents into nodes
-        node_parser = service_context.node_parser
+        node_parser = Settings.node_parser
         nodes = node_parser.get_nodes_from_documents(all_documents)
 
         extracted_entities_list = []
@@ -106,7 +105,7 @@ def add_documents(
         for i, node in enumerate(nodes):
             try:
                 prompt = extraction_prompt_template.format(text=node.text)
-                response = service_context.llm.complete(prompt)
+                response = Settings.llm.complete(prompt)
                 json_output = response.text
                 result = parse_llm_json_output(json_output)
                 
@@ -165,7 +164,7 @@ def add_documents(
                 entity_to_node_text = {}
                 for node in nodes:
                     temp_prompt = extraction_prompt_template.format(text=node.text)
-                    temp_response = service_context.llm.complete(temp_prompt)
+                    temp_response = Settings.llm.complete(temp_prompt)
                     temp_json_output = temp_response.text
                     temp_result = parse_llm_json_output(temp_json_output)
                     if temp_result:
@@ -184,14 +183,21 @@ def add_documents(
                         combined_community_text = " ".join(community_text_parts)
                         try:
                             prompt = summary_prompt_template.format(text=combined_community_text)
-                            response = service_context.llm.complete(prompt)
+                            response = Settings.llm.complete(prompt)
                             json_output = response.text
                             summary_dict = parse_llm_json_output(json_output)
                             
                             if summary_dict:
                                 summary_dict['community_id'] = community_id # Ensure community_id is set
                                 extracted_community_summaries.append(summary_dict)
-                                community_summary_documents.append(Document(text=summary_dict.get('summary', ''), extra_info=summary_dict))
+                                # Flatten metadata for vector store compatibility
+                                flat_metadata = {}
+                                for key, value in summary_dict.items():
+                                    if isinstance(value, (str, int, float, type(None))):
+                                        flat_metadata[key] = value
+                                    else:
+                                        flat_metadata[key] = str(value)
+                                community_summary_documents.append(Document(text=summary_dict.get('summary', ''), extra_info=flat_metadata))
                                 print(f"  Summarized community {community_id} (Level {community_level})")
                         except Exception as e:
                             print(f"  Error summarizing community {community_id}: {e}")
@@ -205,15 +211,18 @@ def add_documents(
 
                 # Create/Update community summary vector index
                 if community_summary_documents:
-                    if community_vector_store:
-                        community_storage_context = StorageContext.from_defaults(vector_store=community_vector_store)
-                        community_index = VectorStoreIndex(community_summary_documents, storage_context=community_storage_context, service_context=service_context)
-                    else:
-                        community_index_dir = os.path.join(output_dir, "community_summaries_index")
-                        os.makedirs(community_index_dir, exist_ok=True)
-                        community_index = VectorStoreIndex(community_summary_documents, service_context=service_context)
-                        community_index.storage_context.persist(persist_dir=community_index_dir)
-                    print("Community summary vector index updated.")
+                    try:
+                        if community_vector_store:
+                            community_storage_context = StorageContext.from_defaults(vector_store=community_vector_store)
+                            community_index = VectorStoreIndex(community_summary_documents, storage_context=community_storage_context)
+                        else:
+                            community_index_dir = os.path.join(output_dir, "community_summaries_index")
+                            os.makedirs(community_index_dir, exist_ok=True)
+                            community_index = VectorStoreIndex(community_summary_documents)
+                            community_index.storage_context.persist(persist_dir=community_index_dir)
+                        print("Community summary vector index updated.")
+                    except Exception as e:
+                        print(f"Error creating community summary vector index: {e}")
                 else:
                     print("No community summaries extracted for indexing.")
             else:
@@ -222,26 +231,32 @@ def add_documents(
             print("No relationships extracted for community detection.")
 
         # Create/Update main text index
-        if vector_store:
-            storage_context = StorageContext.from_defaults(vector_store=vector_store)
-            index = VectorStoreIndex(nodes, storage_context=storage_context, service_context=service_context)
-        else:
-            index = VectorStoreIndex(nodes, service_context=service_context)
-            index.storage_context.persist(persist_dir=output_dir)
-        print("Main text index updated.")
+        try:
+            if vector_store:
+                storage_context = StorageContext.from_defaults(vector_store=vector_store)
+                index = VectorStoreIndex(nodes, storage_context=storage_context)
+            else:
+                index = VectorStoreIndex(nodes)
+                index.storage_context.persist(persist_dir=output_dir)
+            print("Main text index updated.")
+        except Exception as e:
+            print(f"Error creating main text index: {e}")
 
         # Create/Update entity vector index
         if entity_documents:
-            if entity_vector_store:
-                entity_storage_context = StorageContext.from_defaults(vector_store=entity_vector_store)
-                entity_index = VectorStoreIndex(entity_documents, storage_context=entity_storage_context, service_context=service_context)
-            else:
-                # If no specific entity_vector_store, use default storage for entities
-                entity_index_dir = os.path.join(output_dir, "entities_index")
-                os.makedirs(entity_index_dir, exist_ok=True)
-                entity_index = VectorStoreIndex(entity_documents, service_context=service_context)
-                entity_index.storage_context.persist(persist_dir=entity_index_dir)
-            print("Entity vector index updated.")
+            try:
+                if entity_vector_store:
+                    entity_storage_context = StorageContext.from_defaults(vector_store=entity_vector_store)
+                    entity_index = VectorStoreIndex(entity_documents, storage_context=entity_storage_context)
+                else:
+                    # If no specific entity_vector_store, use default storage for entities
+                    entity_index_dir = os.path.join(output_dir, "entities_index")
+                    os.makedirs(entity_index_dir, exist_ok=True)
+                    entity_index = VectorStoreIndex(entity_documents)
+                    entity_index.storage_context.persist(persist_dir=entity_index_dir)
+                print("Entity vector index updated.")
+            except Exception as e:
+                print(f"Error creating entity vector index: {e}")
         else:
             print("No entities extracted for indexing.")
 

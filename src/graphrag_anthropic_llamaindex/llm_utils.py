@@ -5,6 +5,16 @@ def parse_llm_json_output(json_string):
         # Claude sometimes wraps JSON in markdown code blocks
         if json_string.strip().startswith("```json") and json_string.strip().endswith("```"):
             json_string = json_string.strip()[7:-3].strip()
+        elif json_string.strip().startswith("```") and json_string.strip().endswith("```"):
+            # Handle generic code blocks
+            json_string = json_string.strip()[3:-3].strip()
+        
+        # Try to extract JSON from the string if it contains other text
+        start_idx = json_string.find('{')
+        end_idx = json_string.rfind('}')
+        if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
+            json_string = json_string[start_idx:end_idx+1]
+        
         return json.loads(json_string)
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON from LLM: {e}")

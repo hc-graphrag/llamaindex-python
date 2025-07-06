@@ -3,7 +3,7 @@ import argparse
 
 from llama_index.llms.anthropic import Anthropic
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core import Settings, ServiceContext
+from llama_index.core import Settings
 from llama_index.core.node_parser import SentenceSplitter
 
 from graphrag_anthropic_llamaindex.config_manager import load_config
@@ -58,15 +58,11 @@ def main():
     chunk_overlap = chunking_config.get("chunk_overlap", 20)
     node_parser = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
-    # Create ServiceContext
+    # Configure Settings
     llm = Anthropic(**llm_params)
-    service_context = ServiceContext.from_defaults(
-        llm=llm,
-        embed_model=embed_model,
-        node_parser=node_parser,
-    )
-
-    # Set tokenizer for LlamaIndex Settings
+    Settings.llm = llm
+    Settings.embed_model = embed_model
+    Settings.node_parser = node_parser
     Settings.tokenizer = llm.tokenizer
 
     community_detection_config = config.get("community_detection", {})
@@ -74,10 +70,10 @@ def main():
     if args.command == "add":
         add_documents(input_dir, output_dir, main_vector_store,
                       entity_vector_store,
-                      community_vector_store, service_context, community_detection_config)
+                      community_vector_store, community_detection_config)
     elif args.command == "search":
         search_index(args.query, output_dir, llm_params, main_vector_store,
-                     entity_vector_store, community_vector_store, service_context, args.target_index)
+                     entity_vector_store, community_vector_store, args.target_index)
 
 if __name__ == "__main__":
     main()
