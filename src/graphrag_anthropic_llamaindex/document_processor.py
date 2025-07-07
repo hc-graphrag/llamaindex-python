@@ -21,6 +21,9 @@ from graphrag_anthropic_llamaindex.db_manager import (
 )
 from graphrag_anthropic_llamaindex.graph_operations import cluster_graph
 from graphrag_anthropic_llamaindex.llm_utils import parse_llm_json_output, extraction_prompt_template, summary_prompt_template, _get_full_llm_response_with_continuation
+import fsspec
+import hashlib
+from pathlib import Path
 
 
 
@@ -31,17 +34,60 @@ def add_documents(
     entity_vector_store=None,
     community_vector_store=None,
     community_detection_config=None,
+    use_archive_reader=True,
 ):
     """Adds documents from the data directory to the index."""
     print(f"Adding documents from '{input_dir}'...")
-    try:
-        processed_files_df = load_processed_files_db(output_dir)
-        processed_hashes = set(processed_files_df['hash'].tolist())
-        newly_processed_files = []
+    
+    processed_files_df = load_processed_files_db(output_dir)
+    processed_hashes = set(processed_files_df['hash'].tolist())
+    newly_processed_files = []
 
-        all_documents = []
-
-        # Get all files in the data directory, including subdirectories
+    # Define supported file extensions
+    unstructured_supported_exts = [
+        ".txt", ".text", ".eml", ".msg", ".html", ".htm", ".xml", ".json",
+        ".tsv", ".md", ".rst", ".rtf", ".odt", ".doc", ".docx",
+        ".ppt", ".pptx", ".pdf", ".png", ".jpg", ".jpeg", ".heic", ".epub",
+    ]
+    file_extractor = {ext: UnstructuredReader() for ext in unstructured_supported_exts}
+    
+    if use_archive_reader:
+        print("Loading documents with archive support...")
+        all_documents = _load_documents_with_archives(
+            input_dir=input_dir,
+            file_extractor=file_extractor,
+            show_progress=True
+        )
+        
+        # Process documents and check for duplicates
+        for doc in all_documents:
+            # Get document source path (virtual or physical)
+            source_path = doc.extra_info.get('virtual_path', 
+                                            doc.extra_info.get('file_name', 'unknown'))
+            
+            # Calculate hash for duplicate detection using SHA-256
+            doc_hash = _calculate_document_hash(doc.text, source_path)
+            
+            if doc_hash in processed_hashes:
+                print(f"Skipping already processed document: {source_path}")
+                continue
+            
+            newly_processed_files.append({
+                'filepath': source_path,
+                'hash': doc_hash,
+                'original_path': doc.extra_info.get('source_archive', source_path)
+            })
+            
+            print(f"Added document: {source_path}")
+        
+        # Filter out already processed documents
+        all_documents = [doc for doc in all_documents 
+                        if _calculate_document_hash(doc.text, 
+                                                   doc.extra_info.get('virtual_path', 
+                                                                     doc.extra_info.get('file_name', 'unknown'))) 
+                        not in processed_hashes]
+    else:
+        # Legacy processing (backward compatibility)
         all_file_paths = []
         for root, _, files in os.walk(input_dir):
             for file in files:
@@ -68,8 +114,7 @@ def add_documents(
         # Process non-CSV files using UnstructuredReader
         unstructured_supported_exts = [
             ".txt", ".text", ".eml", ".msg", ".html", ".htm", ".xml", ".json",
-            ".tsv", ".md", 
-            ".rst", ".rtf", ".odt", ".doc", ".docx",
+            ".tsv", ".md", ".rst", ".rtf", ".odt", ".doc", ".docx",
             ".ppt", ".pptx", ".pdf", ".png", ".jpg", ".jpeg", ".heic", ".epub",
         ]
         file_extractor = {ext: UnstructuredReader() for ext in unstructured_supported_exts}
@@ -83,10 +128,6 @@ def add_documents(
             files_to_process_with_unstructured.append(non_csv_path)
             newly_processed_files.append({'filepath': non_csv_path, 'hash': file_hash})
 
-        if not all_documents and not files_to_process_with_unstructured:
-            print("No new documents to add.")
-            return
-
         if files_to_process_with_unstructured:
             reader = SimpleDirectoryReader(
                 input_files=files_to_process_with_unstructured,
@@ -96,6 +137,11 @@ def add_documents(
             non_csv_documents = reader.load_data()
             all_documents.extend(non_csv_documents)
 
+    if not all_documents:
+        print("No new documents to add.")
+        return
+
+    try:
         # Chunk documents into nodes
         node_parser = Settings.node_parser
         nodes = node_parser.get_nodes_from_documents(all_documents)
@@ -120,7 +166,8 @@ def add_documents(
                 print(f"  Processed chunk {i+1}/{len(nodes)}")
             except Exception as e:
                 print(f"  Error extracting from chunk {i+1}: {e}")
-                traceback.print_exc() # Print full traceback for debugging
+                traceback.print_exc()
+                raise RuntimeError(f"Entity extraction failed for chunk {i+1}") from e
 
         # Save extracted entities and relationships to Parquet
         if extracted_entities_list:
@@ -201,6 +248,7 @@ def add_documents(
                                 print(f"  Summarized community {community_id} (Level {community_level})")
                         except Exception as e:
                             print(f"  Error summarizing community {community_id}: {e}")
+                            raise RuntimeError(f"Community summarization failed for community {community_id}") from e
             
                 if extracted_community_summaries:
                     new_summaries_df = pd.DataFrame(extracted_community_summaries)
@@ -223,6 +271,7 @@ def add_documents(
                         print("Community summary vector index updated.")
                     except Exception as e:
                         print(f"Error creating community summary vector index: {e}")
+                        raise RuntimeError("Community summary vector index creation failed") from e
                 else:
                     print("No community summaries extracted for indexing.")
             else:
@@ -241,6 +290,7 @@ def add_documents(
             print("Main text index updated.")
         except Exception as e:
             print(f"Error creating main text index: {e}")
+            raise RuntimeError("Main text index creation failed") from e
 
         # Create/Update entity vector index
         if entity_documents:
@@ -257,6 +307,7 @@ def add_documents(
                 print("Entity vector index updated.")
             except Exception as e:
                 print(f"Error creating entity vector index: {e}")
+                raise RuntimeError("Entity vector index creation failed") from e
         else:
             print("No entities extracted for indexing.")
 
@@ -267,4 +318,143 @@ def add_documents(
         print("Documents and entities processed successfully.")
     except Exception as e:
         print(f"Error adding documents: {e}")
-        traceback.print_exc() # Print full traceback for debugging
+        traceback.print_exc()
+        raise  # Re-raise to prevent silent failures
+
+
+# Archive processing functions
+
+# Supported archive formats
+_SUPPORTED_ARCHIVE_FORMATS = ['.zip', '.tar', '.tar.gz', '.tgz', '.tar.bz2']
+
+
+def _calculate_document_hash(text: str, source_path: str) -> str:
+    """
+    Calculate document hash using SHA-256
+    
+    Args:
+        text: Document text content
+        source_path: Source path (including virtual paths)
+        
+    Returns:
+        str: SHA-256 hash string
+    """
+    combined = f"{text}:{source_path}"
+    return hashlib.sha256(combined.encode('utf-8')).hexdigest()
+
+
+def _create_archive_filesystem(archive_path: str) -> 'fsspec.AbstractFileSystem':
+    """
+    Create filesystem for archive file
+    
+    Args:
+        archive_path: Path to archive file
+        
+    Returns:
+        fsspec.AbstractFileSystem: Filesystem for the archive
+        
+    Raises:
+        ValueError: If archive format is not supported
+    """
+    file_ext = Path(archive_path).suffix.lower()
+    
+    if file_ext == '.zip':
+        return fsspec.filesystem('zip', fo=archive_path)
+    elif file_ext in ['.tar', '.tar.gz', '.tgz', '.tar.bz2']:
+        return fsspec.filesystem('tar', fo=archive_path)
+    else:
+        raise ValueError(f"Unsupported archive format: {file_ext} for {archive_path}")
+
+
+def _find_archive_files(input_dir: str) -> List[str]:
+    """
+    Find archive files in directory
+    
+    Args:
+        input_dir: Directory to search
+        
+    Returns:
+        List[str]: List of archive file paths
+    """
+    archive_files = []
+    for root, _, files in os.walk(input_dir):
+        for file in files:
+            if Path(file).suffix.lower() in _SUPPORTED_ARCHIVE_FORMATS:
+                archive_files.append(os.path.join(root, file))
+    return archive_files
+
+
+def _load_documents_with_archives(
+    input_dir: str,
+    file_extractor: Dict[str, Any],
+    recursive: bool = True,
+    show_progress: bool = False
+) -> List[Document]:
+    """
+    Load documents with archive support
+    
+    Args:
+        input_dir: Input directory path
+        file_extractor: File extractor mapping
+        recursive: Whether to search recursively
+        show_progress: Whether to show progress
+        
+    Returns:
+        List[Document]: Loaded documents
+    """
+    all_docs = []
+    
+    # Load regular files
+    regular_reader = SimpleDirectoryReader(
+        input_dir=input_dir,
+        file_extractor=file_extractor,
+        recursive=recursive
+    )
+    regular_docs = regular_reader.load_data(show_progress=show_progress)
+    all_docs.extend(regular_docs)
+    
+    # Load archive files
+    archive_files = _find_archive_files(input_dir)
+    for archive_path in archive_files:
+        if show_progress:
+            print(f"Processing archive: {archive_path}")
+            
+        try:
+            archive_fs = _create_archive_filesystem(archive_path)
+            archive_reader = SimpleDirectoryReader(
+                input_dir="",
+                fs=archive_fs,
+                file_extractor=file_extractor,
+                file_metadata=lambda fname: _create_archive_metadata(fname, archive_path)
+            )
+            archive_docs = archive_reader.load_data(show_progress=show_progress)
+            all_docs.extend(archive_docs)
+            
+            if show_progress:
+                print(f"Loaded {len(archive_docs)} documents from archive: {archive_path}")
+                
+        except Exception as e:
+            print(f"Error processing archive {archive_path}: {e}")
+            raise RuntimeError(f"Archive processing failed: {archive_path}") from e
+    
+    return all_docs
+
+
+def _create_archive_metadata(internal_path: str, archive_path: str) -> Dict[str, Any]:
+    """
+    Create metadata for archive file
+    
+    Args:
+        internal_path: Path within archive
+        archive_path: Path to archive file
+        
+    Returns:
+        Dict[str, Any]: Metadata dictionary
+    """
+    return {
+        "source_archive": archive_path,
+        "archive_internal_path": internal_path,
+        "virtual_path": f"{archive_path}!/{internal_path}",
+        "is_from_archive": True
+    }
+
