@@ -15,4 +15,5 @@ poetry.lock
 data
 graphrag_output
 
+.claude
 .gemini
