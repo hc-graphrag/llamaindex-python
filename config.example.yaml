@@ -15,6 +15,23 @@ chunking:
 input_dir: "./data"
 output_dir: "./graphrag_output"
 
+# Ignore patterns for file processing
+ignore_patterns:
+  - "*.tmp"
+  - "*.log"
+  - "*.cache"
+  - "*.bak"
+  - "*.swp"
+  - "*.DS_Store"
+  - "Thumbs.db"
+  - ".git/*"
+  - ".gitignore"
+  - "__pycache__/*"
+  - "*.pyc"
+  - "node_modules/*"
+  - ".env"
+  - ".env.*"
+
 vector_store:
   type: "lancedb" # or "default"
   lancedb:

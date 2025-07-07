@@ -10,6 +10,7 @@ from graphrag_anthropic_llamaindex.config_manager import load_config
 from graphrag_anthropic_llamaindex.vector_store_manager import get_vector_store
 from graphrag_anthropic_llamaindex.document_processor import add_documents
 from graphrag_anthropic_llamaindex.search_processor import search_index
+from graphrag_anthropic_llamaindex.file_filter import FileFilter
 
 def main():
     """Main function to run the GraphRAG CLI."""
@@ -65,11 +66,16 @@ def main():
     Settings.node_parser = node_parser
 
     community_detection_config = config.get("community_detection", {})
+    ignore_patterns = config.get("ignore_patterns", [])
+    
+    # Create file filter with ignore patterns
+    file_filter = FileFilter(ignore_patterns)
 
     if args.command == "add":
         add_documents(input_dir, output_dir, main_vector_store,
                       entity_vector_store,
-                      community_vector_store, community_detection_config)
+                      community_vector_store, community_detection_config,
+                      use_archive_reader=True, file_filter=file_filter)
     elif args.command == "search":
         search_index(args.query, output_dir, llm_params, main_vector_store,
                      entity_vector_store, community_vector_store, args.target_index)

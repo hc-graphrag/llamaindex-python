@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import networkx as nx
 import traceback
+from typing import Dict, Any, List
 from llama_index.core.schema import Document
 from llama_index.core import VectorStoreIndex, StorageContext, SimpleDirectoryReader, Settings
 from llama_index.readers.file import UnstructuredReader
@@ -19,6 +20,7 @@ from graphrag_anthropic_llamaindex.db_manager import (
     load_community_summaries_db,
     save_community_summaries_db,
 )
+from graphrag_anthropic_llamaindex.file_filter import FileFilter
 from graphrag_anthropic_llamaindex.graph_operations import cluster_graph
 from graphrag_anthropic_llamaindex.llm_utils import parse_llm_json_output, extraction_prompt_template, summary_prompt_template, _get_full_llm_response_with_continuation
 import fsspec
@@ -35,9 +37,14 @@ def add_documents(
     community_vector_store=None,
     community_detection_config=None,
     use_archive_reader=True,
+    file_filter=None,
 ):
     """Adds documents from the data directory to the index."""
     print(f"Adding documents from '{input_dir}'...")
+    
+    # Initialize file filter if not provided
+    if file_filter is None:
+        file_filter = FileFilter()
     
     processed_files_df = load_processed_files_db(output_dir)
     processed_hashes = set(processed_files_df['hash'].tolist())
@@ -56,7 +63,8 @@ def add_documents(
         all_documents = _load_documents_with_archives(
             input_dir=input_dir,
             file_extractor=file_extractor,
-            show_progress=True
+            show_progress=True,
+            file_filter=file_filter
         )
         
         # Process documents and check for duplicates
@@ -91,7 +99,11 @@ def add_documents(
         all_file_paths = []
         for root, _, files in os.walk(input_dir):
             for file in files:
-                all_file_paths.append(os.path.join(root, file))
+                file_path = os.path.join(root, file)
+                all_file_paths.append(file_path)
+        
+        # Filter out ignored files
+        all_file_paths = file_filter.filter_file_paths(all_file_paths)
 
         # Separate CSV and non-CSV files
         csv_file_paths = [f for f in all_file_paths if f.endswith('.csv')]
@@ -366,29 +378,30 @@ def _create_archive_filesystem(archive_path: str) -> 'fsspec.AbstractFileSystem'
         raise ValueError(f"Unsupported archive format: {file_ext} for {archive_path}")
 
 
-def _find_archive_files(input_dir: str) -> List[str]:
+def _find_archive_files(input_dir: str, file_filter: FileFilter = None) -> List[str]:
     """
     Find archive files in directory
     
     Args:
         input_dir: Directory to search
+        file_filter: FileFilter instance for filtering files
         
     Returns:
         List[str]: List of archive file paths
     """
-    archive_files = []
-    for root, _, files in os.walk(input_dir):
-        for file in files:
-            if Path(file).suffix.lower() in _SUPPORTED_ARCHIVE_FORMATS:
-                archive_files.append(os.path.join(root, file))
-    return archive_files
+    if file_filter is None:
+        file_filter = FileFilter()
+    
+    # Use FileFilter's find_files method with archive extensions
+    return file_filter.find_files(input_dir, extensions=_SUPPORTED_ARCHIVE_FORMATS)
 
 
 def _load_documents_with_archives(
     input_dir: str,
     file_extractor: Dict[str, Any],
     recursive: bool = True,
-    show_progress: bool = False
+    show_progress: bool = False,
+    file_filter: FileFilter = None
 ) -> List[Document]:
     """
     Load documents with archive support
@@ -398,11 +411,16 @@ def _load_documents_with_archives(
         file_extractor: File extractor mapping
         recursive: Whether to search recursively
         show_progress: Whether to show progress
+        file_filter: FileFilter instance for filtering files
         
     Returns:
         List[Document]: Loaded documents
     """
     all_docs = []
+    
+    # Initialize file filter if not provided
+    if file_filter is None:
+        file_filter = FileFilter()
     
     # Load regular files
     regular_reader = SimpleDirectoryReader(
@@ -411,10 +429,13 @@ def _load_documents_with_archives(
         recursive=recursive
     )
     regular_docs = regular_reader.load_data(show_progress=show_progress)
+    
+    # Filter out ignored files from regular docs
+    regular_docs = file_filter.filter_documents(regular_docs)
     all_docs.extend(regular_docs)
     
     # Load archive files
-    archive_files = _find_archive_files(input_dir)
+    archive_files = _find_archive_files(input_dir, file_filter)
     for archive_path in archive_files:
         if show_progress:
             print(f"Processing archive: {archive_path}")
