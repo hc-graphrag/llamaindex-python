@@ -53,101 +53,50 @@ def add_documents(
     # Define supported file extensions
     unstructured_supported_exts = [
         ".txt", ".text", ".eml", ".msg", ".html", ".htm", ".xml", ".json",
-        ".tsv", ".md", ".rst", ".rtf", ".odt", ".doc", ".docx",
+        ".tsv", ".md", ".rst", ".rtf", ".odt", ".doc", ".docx", ".mermaid", ".plantuml",
         ".ppt", ".pptx", ".pdf", ".png", ".jpg", ".jpeg", ".heic", ".epub",
     ]
     file_extractor = {ext: UnstructuredReader() for ext in unstructured_supported_exts}
     
-    if use_archive_reader:
-        print("Loading documents with archive support...")
-        all_documents = _load_documents_with_archives(
-            input_dir=input_dir,
-            file_extractor=file_extractor,
-            show_progress=True,
-            file_filter=file_filter
-        )
+    # Load documents with unified processing logic
+    print("Loading documents...")
+    all_documents = _load_documents_with_archives(
+        input_dir=input_dir,
+        file_extractor=file_extractor,
+        show_progress=True,
+        file_filter=file_filter,
+        use_archive_reader=use_archive_reader
+    )
+    
+    # Process documents and check for duplicates
+    for doc in all_documents:
+        # Get document source path (virtual or physical)
+        source_path = doc.extra_info.get('virtual_path', 
+                                        doc.extra_info.get('source_path',
+                                                          doc.extra_info.get('file_name', 'unknown')))
         
-        # Process documents and check for duplicates
-        for doc in all_documents:
-            # Get document source path (virtual or physical)
-            source_path = doc.extra_info.get('virtual_path', 
-                                            doc.extra_info.get('file_name', 'unknown'))
-            
-            # Calculate hash for duplicate detection using SHA-256
-            doc_hash = _calculate_document_hash(doc.text, source_path)
-            
-            if doc_hash in processed_hashes:
-                print(f"Skipping already processed document: {source_path}")
-                continue
-            
-            newly_processed_files.append({
-                'filepath': source_path,
-                'hash': doc_hash,
-                'original_path': doc.extra_info.get('source_archive', source_path)
-            })
-            
-            print(f"Added document: {source_path}")
+        # Calculate hash for duplicate detection using SHA-256
+        doc_hash = _calculate_document_hash(doc.text, source_path)
         
-        # Filter out already processed documents
-        all_documents = [doc for doc in all_documents 
-                        if _calculate_document_hash(doc.text, 
-                                                   doc.extra_info.get('virtual_path', 
-                                                                     doc.extra_info.get('file_name', 'unknown'))) 
-                        not in processed_hashes]
-    else:
-        # Legacy processing (backward compatibility)
-        all_file_paths = []
-        for root, _, files in os.walk(input_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                all_file_paths.append(file_path)
+        if doc_hash in processed_hashes:
+            print(f"Skipping already processed document: {source_path}")
+            continue
         
-        # Filter out ignored files
-        all_file_paths = file_filter.filter_file_paths(all_file_paths)
-
-        # Separate CSV and non-CSV files
-        csv_file_paths = [f for f in all_file_paths if f.endswith('.csv')]
-        non_csv_file_paths = [f for f in all_file_paths if not f.endswith('.csv')]
-
-        # Process CSV files
-        for csv_path in csv_file_paths:
-            file_hash = calculate_file_hash(csv_path)
-            if file_hash in processed_hashes:
-                print(f"Skipping already processed CSV file: {csv_path}")
-                continue
-
-            print(f"Processing CSV file: {csv_path}")
-            df = pd.read_csv(csv_path)
-            for index, row in df.iterrows():
-                doc_content = ", ".join([f"{col}: {val}" for col, val in row.items()])
-                all_documents.append(Document(text=doc_content, extra_info={"file_name": os.path.basename(csv_path), "row_index": index}))
-            newly_processed_files.append({'filepath': csv_path, 'hash': file_hash})
-
-        # Process non-CSV files using UnstructuredReader
-        unstructured_supported_exts = [
-            ".txt", ".text", ".eml", ".msg", ".html", ".htm", ".xml", ".json",
-            ".tsv", ".md", ".rst", ".rtf", ".odt", ".doc", ".docx",
-            ".ppt", ".pptx", ".pdf", ".png", ".jpg", ".jpeg", ".heic", ".epub",
-        ]
-        file_extractor = {ext: UnstructuredReader() for ext in unstructured_supported_exts}
-
-        files_to_process_with_unstructured = []
-        for non_csv_path in non_csv_file_paths:
-            file_hash = calculate_file_hash(non_csv_path)
-            if file_hash in processed_hashes:
-                print(f"Skipping already processed file: {non_csv_path}")
-                continue
-            files_to_process_with_unstructured.append(non_csv_path)
-            newly_processed_files.append({'filepath': non_csv_path, 'hash': file_hash})
-
-        if files_to_process_with_unstructured:
-            reader = SimpleDirectoryReader(
-                input_files=files_to_process_with_unstructured,
-                file_extractor=file_extractor,
-                recursive=False
-            )
-            non_csv_documents = reader.load_data()
-            all_documents.extend(non_csv_documents)
+        newly_processed_files.append({
+            'filepath': source_path,
+            'hash': doc_hash,
+            'original_path': doc.extra_info.get('source_archive', source_path)
+        })
+        
+        print(f"Added document: {source_path}")
+    
+    # Filter out already processed documents
+    all_documents = [doc for doc in all_documents 
+                    if _calculate_document_hash(doc.text, 
+                                               doc.extra_info.get('virtual_path', 
+                                                                 doc.extra_info.get('source_path',
+                                                                                   doc.extra_info.get('file_name', 'unknown')))) 
+                    not in processed_hashes]
 
     if not all_documents:
         print("No new documents to add.")
@@ -401,10 +350,11 @@ def _load_documents_with_archives(
     file_extractor: Dict[str, Any],
     recursive: bool = True,
     show_progress: bool = False,
-    file_filter: FileFilter = None
+    file_filter: FileFilter = None,
+    use_archive_reader: bool = True
 ) -> List[Document]:
     """
-    Load documents with archive support
+    Load documents with unified processing logic
     
     Args:
         input_dir: Input directory path
@@ -412,6 +362,7 @@ def _load_documents_with_archives(
         recursive: Whether to search recursively
         show_progress: Whether to show progress
         file_filter: FileFilter instance for filtering files
+        use_archive_reader: Whether to process archive files
         
     Returns:
         List[Document]: Loaded documents
@@ -422,43 +373,164 @@ def _load_documents_with_archives(
     if file_filter is None:
         file_filter = FileFilter()
     
-    # Load regular files
-    regular_reader = SimpleDirectoryReader(
-        input_dir=input_dir,
-        file_extractor=file_extractor,
-        recursive=recursive
-    )
-    regular_docs = regular_reader.load_data(show_progress=show_progress)
+    # Process regular files
+    all_docs.extend(_process_regular_files(input_dir, file_extractor, recursive, show_progress, file_filter))
     
-    # Filter out ignored files from regular docs
-    regular_docs = file_filter.filter_documents(regular_docs)
-    all_docs.extend(regular_docs)
-    
-    # Load archive files
-    archive_files = _find_archive_files(input_dir, file_filter)
-    for archive_path in archive_files:
-        if show_progress:
-            print(f"Processing archive: {archive_path}")
-            
-        try:
-            archive_fs = _create_archive_filesystem(archive_path)
-            archive_reader = SimpleDirectoryReader(
-                input_dir="",
-                fs=archive_fs,
-                file_extractor=file_extractor,
-                file_metadata=lambda fname: _create_archive_metadata(fname, archive_path)
-            )
-            archive_docs = archive_reader.load_data(show_progress=show_progress)
-            all_docs.extend(archive_docs)
-            
-            if show_progress:
-                print(f"Loaded {len(archive_docs)} documents from archive: {archive_path}")
-                
-        except Exception as e:
-            print(f"Error processing archive {archive_path}: {e}")
-            raise RuntimeError(f"Archive processing failed: {archive_path}") from e
+    # Process archive files only if enabled
+    if use_archive_reader:
+        archive_files = _find_archive_files(input_dir, file_filter)
+        for archive_path in archive_files:
+            all_docs.extend(_process_archive_files(archive_path, file_extractor, show_progress, file_filter))
     
     return all_docs
+
+
+def _process_regular_files(
+    input_dir: str,
+    file_extractor: Dict[str, Any],
+    recursive: bool,
+    show_progress: bool,
+    file_filter: FileFilter
+) -> List[Document]:
+    """Process regular files with CSV special handling"""
+    all_docs = []
+    
+    # Find all files
+    all_file_paths = []
+    if recursive:
+        for root, _, files in os.walk(input_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                all_file_paths.append(file_path)
+    else:
+        for file in os.listdir(input_dir):
+            file_path = os.path.join(input_dir, file)
+            if os.path.isfile(file_path):
+                all_file_paths.append(file_path)
+    
+    # Filter files
+    all_file_paths = file_filter.filter_file_paths(all_file_paths)
+    
+    # Separate CSV and non-CSV files
+    csv_files = [f for f in all_file_paths if f.endswith('.csv')]
+    non_csv_files = [f for f in all_file_paths if not f.endswith('.csv')]
+    
+    # Process CSV files with row-by-row logic
+    for csv_path in csv_files:
+        if show_progress:
+            print(f"Processing CSV file: {csv_path}")
+        all_docs.extend(_process_csv_file(csv_path))
+    
+    # Process non-CSV files with UnstructuredReader
+    if non_csv_files:
+        reader = SimpleDirectoryReader(
+            input_files=non_csv_files,
+            file_extractor=file_extractor,
+            recursive=False
+        )
+        non_csv_docs = reader.load_data(show_progress=show_progress)
+        all_docs.extend(non_csv_docs)
+    
+    return all_docs
+
+
+def _process_archive_files(
+    archive_path: str,
+    file_extractor: Dict[str, Any],
+    show_progress: bool,
+    file_filter: FileFilter
+) -> List[Document]:
+    """Process archive files with CSV special handling"""
+    all_docs = []
+    
+    if show_progress:
+        print(f"Processing archive: {archive_path}")
+    
+    try:
+        archive_fs = _create_archive_filesystem(archive_path)
+        
+        # List all files in archive
+        all_archive_files = archive_fs.find("", detail=False)
+        
+        # Separate CSV and non-CSV files
+        csv_files = [f for f in all_archive_files if f.endswith('.csv')]
+        non_csv_files = [f for f in all_archive_files if not f.endswith('.csv')]
+        
+        # Process CSV files from archive
+        for csv_file in csv_files:
+            if show_progress:
+                print(f"Processing CSV from archive: {csv_file}")
+            all_docs.extend(_process_csv_from_archive(csv_file, archive_path, archive_fs))
+        
+        # Process non-CSV files from archive
+        if non_csv_files:
+            # Filter non-CSV files from archive
+            filtered_non_csv_files = file_filter.filter_file_paths(non_csv_files)
+            if filtered_non_csv_files:
+                archive_reader = SimpleDirectoryReader(
+                    input_dir="",
+                    fs=archive_fs,
+                    file_extractor=file_extractor,
+                    file_metadata=lambda fname: _create_archive_metadata(fname, archive_path)
+                )
+                archive_docs = archive_reader.load_data(show_progress=show_progress)
+                all_docs.extend(archive_docs)
+        
+        if show_progress:
+            print(f"Loaded {len(all_docs)} documents from archive: {archive_path}")
+    
+    except Exception as e:
+        print(f"Error processing archive {archive_path}: {e}")
+        raise RuntimeError(f"Archive processing failed: {archive_path}") from e
+    
+    return all_docs
+
+def _process_csv_file(csv_path: str) -> List[Document]:
+    """Process CSV file with row-by-row document creation"""
+    documents = []
+    try:
+        df = pd.read_csv(csv_path)
+        for index, row in df.iterrows():
+            doc_content = ", ".join([f"{col}: {val}" for col, val in row.items()])
+            documents.append(Document(
+                text=doc_content,
+                extra_info={
+                    "file_name": os.path.basename(csv_path),
+                    "row_index": index,
+                    "source_path": csv_path
+                }
+            ))
+    except Exception as e:
+        print(f"Error processing CSV file {csv_path}: {e}")
+        raise RuntimeError(f"CSV processing failed: {csv_path}") from e
+    
+    return documents
+
+
+def _process_csv_from_archive(csv_file: str, archive_path: str, archive_fs) -> List[Document]:
+    """Process CSV file from archive with row-by-row document creation"""
+    documents = []
+    try:
+        with archive_fs.open(csv_file, 'r') as f:
+            df = pd.read_csv(f)
+            for index, row in df.iterrows():
+                doc_content = ", ".join([f"{col}: {val}" for col, val in row.items()])
+                documents.append(Document(
+                    text=doc_content,
+                    extra_info={
+                        "file_name": os.path.basename(csv_file),
+                        "row_index": index,
+                        "source_archive": archive_path,
+                        "archive_internal_path": csv_file,
+                        "virtual_path": f"{archive_path}!/{csv_file}",
+                        "is_from_archive": True
+                    }
+                ))
+    except Exception as e:
+        print(f"Error processing CSV from archive {csv_file}: {e}")
+        raise RuntimeError(f"Archive CSV processing failed: {csv_file}") from e
+    
+    return documents
 
 
 def _create_archive_metadata(internal_path: str, archive_path: str) -> Dict[str, Any]:
