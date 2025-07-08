@@ -53,8 +53,9 @@ dependencies = [
     "llama-index-embeddings-huggingface>=0.5.5",
     "graspologic>=3.4.1",
     "future>=1.0.0",
+    "gradio>=5.35.0",
 ]
-requires-python = "<3.12,>=3.9"
+requires-python = ">=3.10,<3.12"
 readme = "README.md"
 license = {text = "MIT"}
 
