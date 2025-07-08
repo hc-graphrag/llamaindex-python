@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  graphrag-app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: graphrag-anthropic-app
+    ports:
+      - "7860:7860"
+    volumes:
+      # Mount local directories to container
+      - ../data:/app/data:ro                    # 入力ドキュメント（読み取り専用）
+      - ../graphrag_output:/app/graphrag_output # 処理結果・インデックス
+      - ../config.yaml:/app/config.yaml:ro      # 設定ファイル（読み取り専用）
+      # ログや一時ファイル用
+      - graphrag-logs:/app/logs
+    environment:
+      # Anthropic API key (set in .env file or environment)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Gradio settings
+      - GRADIO_SERVER_NAME=0.0.0.0
+      - GRADIO_SERVER_PORT=7860
+      # Python settings
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  graphrag-logs:
