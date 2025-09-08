@@ -12,6 +12,7 @@ from graphrag_anthropic_llamaindex.vector_store_manager import get_vector_store
 from graphrag_anthropic_llamaindex.document_processor import add_documents
 from graphrag_anthropic_llamaindex.search_processor import search_index
 from graphrag_anthropic_llamaindex.file_filter import FileFilter
+from graphrag_anthropic_llamaindex.global_search import SearchModeRouter, GlobalSearchRetriever
 
 def main():
     """Main function to run the GraphRAG CLI."""
@@ -25,7 +26,17 @@ def main():
     # 'search' command
     search_parser = subparsers.add_parser("search", help="Search the index.")
     search_parser.add_argument("query", type=str, help="The search query.")
-    search_parser.add_argument("--target-index", type=str, default="both", choices=["main", "entity", "community", "both"], help="Specify which index to search: 'main', 'entity', 'community', or 'both'.")
+    search_parser.add_argument("--mode", type=str, default="global", choices=["local", "global", "drift", "auto"], 
+                               help="Search mode: 'local' (detailed), 'global' (comprehensive), 'drift' (future), or 'auto' (automatic selection).")
+    search_parser.add_argument("--response-type", type=str, default="multiple paragraphs",
+                               help="Response type for global search (e.g., 'multiple paragraphs', 'single paragraph', 'list').")
+    search_parser.add_argument("--output-format", type=str, default="markdown", choices=["markdown", "json"],
+                               help="Output format: 'markdown' or 'json'.")
+    search_parser.add_argument("--min-community-rank", type=int, default=0,
+                               help="Minimum community rank to include (0 = all levels).")
+    # Keep backward compatibility
+    search_parser.add_argument("--target-index", type=str, choices=["main", "entity", "community", "both"], 
+                               help="(Deprecated) Use --mode instead. Specify which index to search.")
 
     args = parser.parse_args()
 
@@ -111,8 +122,59 @@ def main():
                       community_vector_store, community_detection_config,
                       use_archive_reader=True, file_filter=file_filter)
     elif args.command == "search":
-        search_index(args.query, output_dir, llm_params, main_vector_store,
-                     entity_vector_store, community_vector_store, args.target_index)
+        # Handle backward compatibility with --target-index
+        if args.target_index:
+            print("Warning: --target-index is deprecated. Please use --mode instead.")
+            # Map old target-index to new mode
+            if args.target_index in ["main", "entity", "both"]:
+                mode = "local"
+            elif args.target_index == "community":
+                mode = "global"
+            else:
+                mode = "global"
+        else:
+            mode = args.mode
+        
+        # Use the new SearchModeRouter for unified search interface
+        try:
+            router = SearchModeRouter(
+                config=config,
+                mode=mode,
+                vector_store_main=main_vector_store,
+                vector_store_entity=entity_vector_store,
+                vector_store_community=community_vector_store,
+                response_type=args.response_type,
+                min_community_rank=args.min_community_rank,
+                output_format=args.output_format
+            )
+            
+            # Execute search
+            from llama_index.core.schema import QueryBundle
+            query_bundle = QueryBundle(query_str=args.query)
+            results = router._retrieve(query_bundle)
+            
+            # Display results
+            if results:
+                for i, node_with_score in enumerate(results):
+                    if i == 0:  # Main result
+                        if args.output_format == "json":
+                            import json
+                            print(json.dumps(node_with_score.node.metadata, ensure_ascii=False, indent=2))
+                        else:
+                            print(node_with_score.node.text)
+                    else:
+                        # Additional nodes (key points, etc.) if included
+                        if args.output_format == "json":
+                            print(f"\n--- Key Point {i} (Score: {node_with_score.score:.2f}) ---")
+                            print(node_with_score.node.text)
+            else:
+                print("No results found.")
+                
+        except Exception as e:
+            print(f"Error during search: {e}")
+            # Fallback to old search method
+            search_index(args.query, output_dir, llm_params, main_vector_store,
+                        entity_vector_store, community_vector_store, args.target_index or "both")
 
 if __name__ == "__main__":
     main()
