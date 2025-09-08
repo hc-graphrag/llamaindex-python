@@ -23,6 +23,10 @@ def _get_full_llm_response_with_continuation(original_prompt, max_continuation_a
     Includes a safeguard for infinite loops with max_continuation_attempts.
     """
     
+    # LLM設定の確認
+    if Settings.llm is None:
+        raise ValueError("LLMが設定されていません。Settings.llmを設定してください。")
+    
     full_response_text = ""
     attempts = 0
     json_parse_successful = False
@@ -39,7 +43,13 @@ def _get_full_llm_response_with_continuation(original_prompt, max_continuation_a
                 f"続きを生成してください。"
             )
         
-        response = Settings.llm.complete(current_prompt)
+        try:
+            response = Settings.llm.complete(current_prompt)
+        except Exception as e:
+            print(f"LLM呼び出しエラー (試行 {attempts}/{max_continuation_attempts}): {e}")
+            if attempts == max_continuation_attempts:
+                raise e
+            continue
         next_part = response.text
         
         full_response_text = _stitch_responses(full_response_text, next_part)
@@ -49,7 +59,9 @@ def _get_full_llm_response_with_continuation(original_prompt, max_continuation_a
         json_parse_successful = (parsed_json is not None)
         
         # Also check for explicit truncation reason from LLM
-        is_explicitly_truncated = response.raw.get("stop_reason") == "max_tokens"
+        is_explicitly_truncated = False
+        if hasattr(response, 'raw') and response.raw:
+            is_explicitly_truncated = response.raw.get("stop_reason") == "max_tokens"
         
         # If JSON parsing failed AND it's not explicitly truncated, it means the LLM stopped for another reason
         # or produced malformed JSON. We continue if it's explicitly truncated OR if JSON parsing failed.

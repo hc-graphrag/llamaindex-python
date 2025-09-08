@@ -42,6 +42,13 @@ def add_documents(
     """Adds documents from the data directory to the index."""
     print(f"Adding documents from '{input_dir}'...")
     
+    # LLM設定の確認と初期化
+    if Settings.llm is None:
+        raise ValueError("LLMが設定されていません。main.pyでSettings.llmを設定してからadd_documentsを呼び出してください。")
+    
+    print(f"LLM設定確認: {type(Settings.llm).__name__}")
+    print(f"Embedding設定確認: {type(Settings.embed_model).__name__ if Settings.embed_model else 'None'}")
+    
     # Initialize file filter if not provided
     if file_filter is None:
         file_filter = FileFilter()
