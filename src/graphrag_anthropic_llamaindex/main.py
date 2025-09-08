@@ -2,6 +2,7 @@ import os
 import argparse
 
 from llama_index.llms.anthropic import Anthropic
+from llama_index.llms.bedrock import Bedrock
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core import Settings
 from llama_index.core.node_parser import SentenceSplitter
@@ -32,10 +33,24 @@ def main():
     if not config:
         return
 
-    anthropic_config = config.get("anthropic", {})
-    os.environ["ANTHROPIC_API_KEY"] = anthropic_config.get("api_key")
-    model_name = anthropic_config.get("model", "claude-3-opus-20240229")
-    api_base_url = anthropic_config.get("api_base_url")
+    # LLMプロバイダーの設定を取得
+    llm_provider = config.get("llm_provider", "anthropic")  # デフォルトはanthropic
+    api_base_url = None  # 初期化
+    
+    if llm_provider == "bedrock":
+        # AWS Bedrock設定
+        bedrock_config = config.get("bedrock", {})
+        model_name = bedrock_config.get("model", "anthropic.claude-3-sonnet-20240229-v1:0")
+        region_name = bedrock_config.get("region", "us-east-1")
+        aws_access_key_id = bedrock_config.get("aws_access_key_id")
+        aws_secret_access_key = bedrock_config.get("aws_secret_access_key")
+        aws_session_token = bedrock_config.get("aws_session_token")
+    else:
+        # Anthropic直接設定（従来の動作）
+        anthropic_config = config.get("anthropic", {})
+        os.environ["ANTHROPIC_API_KEY"] = anthropic_config.get("api_key")
+        model_name = anthropic_config.get("model", "claude-3-opus-20240229")
+        api_base_url = anthropic_config.get("api_base_url")
 
     input_dir = config.get("input_dir", "./data")
     output_dir = config.get("output_dir", "./graphrag_output")
@@ -59,9 +74,28 @@ def main():
     chunk_overlap = chunking_config.get("chunk_overlap", 20)
     node_parser = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
-    # Configure Settings
-    llm = Anthropic(**llm_params)
-    Settings.llm = llm
+    # Configure Settings based on provider
+    if llm_provider == "bedrock":
+        # AWS Bedrock LLM設定
+        bedrock_params = {
+            "model": model_name,
+            "region_name": region_name,
+        }
+        if aws_access_key_id:
+            bedrock_params["aws_access_key_id"] = aws_access_key_id
+        if aws_secret_access_key:
+            bedrock_params["aws_secret_access_key"] = aws_secret_access_key
+        if aws_session_token:
+            bedrock_params["aws_session_token"] = aws_session_token
+        
+        llm = Bedrock(**bedrock_params)
+        Settings.llm = llm
+        print(f"Using AWS Bedrock with model: {model_name}")
+    else:
+        # Anthropic直接LLM設定
+        llm = Anthropic(**llm_params)
+        Settings.llm = llm
+        print(f"Using Anthropic API with model: {model_name}")
     Settings.embed_model = embed_model
     Settings.node_parser = node_parser
 

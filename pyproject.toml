@@ -54,6 +54,7 @@ dependencies = [
     "graspologic>=3.4.1",
     "future>=1.0.0",
     "gradio>=5.35.0",
+    "llama-index-llms-bedrock>=0.4.1",
 ]
 requires-python = ">=3.10,<3.12"
 readme = "README.md"

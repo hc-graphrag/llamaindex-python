@@ -1,21 +1,14 @@
-# Configuration for graphrag-anthropic-llamaindex
+# Configuration for graphrag-anthropic-llamaindex with AWS Bedrock
 
-# LLMプロバイダー選択: "anthropic" or "bedrock"
-llm_provider: "bedrock"  # or "anthropic"
+# LLMプロバイダー選択: AWS Bedrock
+llm_provider: "bedrock"
 
-# Anthropic API直接使用時の設定
-anthropic:
-  api_key: "YOUR_ANTHROPIC_API_KEY"
-  model: "claude-3-opus-20240620"
-  # api_base_url: "https://api.anthropic.com"
-
-# AWS Bedrock使用時の設定
+# AWS Bedrock設定
 bedrock:
   model: "anthropic.claude-3-sonnet-20240229-v1:0"
   region: "us-east-1"
-  # aws_access_key_id: "YOUR_AWS_ACCESS_KEY"  # 環境変数AWS_ACCESS_KEY_IDを使用する場合は省略可
-  # aws_secret_access_key: "YOUR_AWS_SECRET_KEY"  # 環境変数AWS_SECRET_ACCESS_KEYを使用する場合は省略可
-  # aws_session_token: "YOUR_SESSION_TOKEN"  # セッショントークン（オプション）
+  # AWS認証情報は環境変数から取得
+  # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN
 
 embedding_model:
   name: "intfloat/multilingual-e5-small"
@@ -25,7 +18,7 @@ chunking:
   chunk_overlap: 20
 
 input_dir: "./data"
-output_dir: "./graphrag_output"
+output_dir: "./graphrag_output_bedrock"
 
 # Ignore patterns for file processing
 ignore_patterns:
@@ -45,19 +38,19 @@ ignore_patterns:
   - ".env.*"
 
 vector_store:
-  type: "lancedb" # or "default"
+  type: "lancedb"
   lancedb:
     uri: "lancedb_main"
     table_name: "vectors"
 
 community_vector_store:
-  type: "lancedb" # or "default"
+  type: "lancedb"
   lancedb:
     uri: "lancedb_communities"
     table_name: "community_vectors"
 
 entity_vector_store:
-  type: "lancedb" # or "default"
+  type: "lancedb"
   lancedb:
     uri: "lancedb_entities"
     table_name: "entities_vectors"
