@@ -26,18 +26,21 @@ class MapProcessor:
         self,
         llm_config: Dict[str, Any],
         max_concurrent: int = 5,
-        response_type: str = "multiple paragraphs"
+        response_type: str = "multiple paragraphs",
+        max_response_length: int = 2000
     ):
         """
         Args:
             llm_config: LLM設定辞書
             max_concurrent: 最大同時実行数
             response_type: レスポンスタイプ
+            max_response_length: 応答の最大語数
         """
         # LLMを初期化または既存のSettingsから取得
         self.llm = self._get_or_create_llm(llm_config)
         self.max_concurrent = max_concurrent
         self.response_type = response_type
+        self.max_response_length = max_response_length
         self.semaphore = asyncio.Semaphore(max_concurrent)
     
     def _get_or_create_llm(self, llm_config: Dict[str, Any]):
@@ -112,7 +115,8 @@ class MapProcessor:
             try:
                 # システムプロンプトを構築
                 system_prompt = MAP_SYSTEM_PROMPT.format(
-                    response_type=self.response_type
+                    max_length=self.max_response_length,
+                    context_data=batch["context"]
                 )
                 
                 # ユーザープロンプトを構築
@@ -199,7 +203,7 @@ class MapProcessor:
                             description=point.get("description", ""),
                             score=point.get("score", 50),
                             report_ids=point.get("report_ids", report_ids[:3]),  # 上位3つのレポートIDを使用
-                            source_metadata=self._extract_metadata(records, point.get("report_ids", []))
+                            source_metadata=self._extract_metadata(records, point.get("report_ids", [])) or {}
                         )
                         key_points.append(key_point)
             else:
@@ -239,7 +243,7 @@ class MapProcessor:
                                 description=item.strip(),
                                 score=score,
                                 report_ids=report_ids[:3],
-                                source_metadata=self._extract_metadata(records, report_ids[:3])
+                                source_metadata=self._extract_metadata(records, report_ids[:3]) or {}
                             )
                             key_points.append(key_point)
                 else:
@@ -248,7 +252,7 @@ class MapProcessor:
                         description=paragraph.strip(),
                         score=score,
                         report_ids=report_ids[:3],
-                        source_metadata=self._extract_metadata(records, report_ids[:3])
+                        source_metadata=self._extract_metadata(records, report_ids[:3]) or {}
                     )
                     key_points.append(key_point)
         

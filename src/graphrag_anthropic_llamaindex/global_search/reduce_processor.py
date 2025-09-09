@@ -22,16 +22,19 @@ class ReduceProcessor:
     def __init__(
         self,
         llm_config: Dict[str, Any],
-        response_type: str = "multiple paragraphs"
+        response_type: str = "multiple paragraphs",
+        max_response_length: int = 2000
     ):
         """
         Args:
             llm_config: LLM設定辞書
             response_type: レスポンスタイプ
+            max_response_length: 応答の最大語数
         """
         # LLMを初期化または既存のSettingsから取得
         self.llm = self._get_or_create_llm(llm_config)
         self.response_type = response_type
+        self.max_response_length = max_response_length
     
     def _get_or_create_llm(self, llm_config: Dict[str, Any]):
         """LLMインスタンスを取得または作成"""
@@ -86,7 +89,9 @@ class ReduceProcessor:
         
         # システムプロンプトを構築
         system_prompt = REDUCE_SYSTEM_PROMPT.format(
-            response_type=self.response_type
+            max_length=self.max_response_length,
+            response_type=self.response_type,
+            report_data=context
         )
         
         # ユーザープロンプトを構築

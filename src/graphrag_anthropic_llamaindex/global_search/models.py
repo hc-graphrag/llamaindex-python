@@ -13,7 +13,7 @@ class KeyPoint:
     description: str
     score: int  # 0-100の重要度スコア
     report_ids: List[str]
-    source_metadata: Dict[str, Any]  # document_id, chunk_id, entity_idsなど
+    source_metadata: Optional[Dict[str, Any]] = None  # document_id, chunk_id, entity_idsなど
     
     def to_dict(self) -> Dict[str, Any]:
         """辞書形式に変換"""
