@@ -1,5 +1,6 @@
 import os
 import argparse
+from dotenv import load_dotenv
 
 from llama_index.llms.anthropic import Anthropic
 from llama_index.llms.bedrock import Bedrock
@@ -16,6 +17,9 @@ from graphrag_anthropic_llamaindex.global_search import SearchModeRouter, Global
 
 def main():
     """Main function to run the GraphRAG CLI."""
+    # Load environment variables from .env file
+    load_dotenv()
+    
     parser = argparse.ArgumentParser(description="A CLI for GraphRAG with LlamaIndex and Anthropic.")
     parser.add_argument("--config", default="config.yaml", help="Path to the configuration file.")
     subparsers = parser.add_subparsers(dest="command", required=True)

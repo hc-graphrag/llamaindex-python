@@ -77,6 +77,22 @@ graphrag-anthropic-llamaindex/
 
 ## 設定
 
+### 1. 環境変数の設定
+
+`.env.example` を `.env` としてコピーし、APIキーを設定してください。
+
+```bash
+cp .env.example .env
+```
+
+`.env` ファイルを編集して、Anthropic APIキーを設定:
+
+```
+ANTHROPIC_API_KEY=your-anthropic-api-key-here
+```
+
+### 2. 設定ファイルの作成
+
 `config.example.yaml` を `config.yaml` としてコピーし、必要な設定を更新してください。
 
 ```bash
@@ -84,8 +100,6 @@ cp config.example.yaml config.yaml
 ```
 
 `config.yaml` の主要な設定項目:
-
-*   `anthropic.api_key`: Anthropic APIキーを設定してください。
 *   `anthropic.model`: 使用するClaudeモデル名（例: `claude-3-opus-20240229`）。
 *   `embedding_model.name`: 埋め込みモデル名（デフォルト: `intfloat/multilingual-e5-small`）。
 *   `input_dir`: 処理対象のドキュメントが置かれるディレクトリ（デフォルト: `./data`）。
@@ -150,4 +164,4 @@ poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml
 ./scripts/demo.sh
 ```
 
-**注意:** 初回実行時は、依存関係のインストール、LLMの呼び出し、埋め込みモデルのダウンロードなどにより、時間がかかる場合があります。また、Anthropic APIキーが正しく設定されていることを確認してください。
+**注意:** 初回実行時は、依存関係のインストール、LLMの呼び出し、埋め込みモデルのダウンロードなどにより、時間がかかる場合があります。また、Anthropic APIキーが`.env`ファイルまたは環境変数に正しく設定されていることを確認してください。
