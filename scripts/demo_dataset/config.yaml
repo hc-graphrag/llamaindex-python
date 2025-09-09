@@ -1,0 +1,150 @@
+# Demo Configuration for GraphRAG with DRIFT Search
+
+# LLM Configuration
+llm:
+  type: "anthropic"
+  model: "claude-3-haiku-20240307"
+  temperature: 0.7
+  max_tokens: 4000
+
+# Embedding Configuration  
+embedding:
+  type: "sentence-transformers"
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  dimension: 384
+
+# Document Processing
+document_processing:
+  chunk_size: 1000
+  chunk_overlap: 200
+  min_chunk_size: 100
+
+# Entity Extraction
+entity_extraction:
+  enabled: true
+  types:
+    - "PERSON"
+    - "ORGANIZATION"
+    - "TECHNOLOGY"
+    - "CONCEPT"
+    - "LOCATION"
+    - "EVENT"
+  max_entities_per_chunk: 20
+
+# Relationship Extraction
+relationship_extraction:
+  enabled: true
+  min_confidence: 0.7
+  relationship_types:
+    - "関連"
+    - "影響"
+    - "応用"
+    - "依存"
+    - "競合"
+    - "協力"
+
+# Community Detection
+community_detection:
+  algorithm: "leiden"
+  resolution: 1.0
+  min_community_size: 3
+  max_iterations: 100
+  summary_max_tokens: 500
+
+# Vector Store Configuration
+vector_store:
+  type: "lancedb"
+  path: "./demo_output/lancedb"
+  
+  # Index configurations
+  main_index:
+    metric: "cosine"
+    nprobe: 10
+    
+  entity_index:
+    metric: "cosine"
+    nprobe: 10
+    
+  community_index:
+    metric: "cosine"
+    nprobe: 5
+
+# Search Configurations
+search:
+  # Local Search
+  local:
+    top_k_entities: 10
+    top_k_chunks: 5
+    entity_weight: 0.7
+    chunk_weight: 0.3
+    max_context_tokens: 4000
+    
+  # Global Search  
+  global:
+    top_k_communities: 5
+    min_community_rank: 0
+    include_community_facts: true
+    max_summary_length: 1000
+    
+  # DRIFT Search
+  drift_search:
+    enabled: true
+    
+    local_search:
+      entity_top_k: 10
+      relationship_depth: 2
+      include_text_units: true
+      text_unit_top_k: 5
+      
+    global_search:
+      community_top_k: 5
+      include_summaries: true
+      max_summary_length: 500
+      
+    context:
+      max_tokens: 8000
+      prioritization_strategy: "relevance"  # relevance, recency, mixed
+      include_metadata: true
+      
+    response:
+      temperature: 0.7
+      max_tokens: 2000
+      streaming_enabled: true
+      chunk_size: 50
+
+# Output Configuration
+output:
+  format: "markdown"
+  include_sources: true
+  include_confidence_scores: false
+  max_response_length: 2000
+
+# Logging
+logging:
+  level: "INFO"
+  file: "./demo_output/graphrag.log"
+  
+# Performance
+performance:
+  parallel_processing: true
+  max_workers: 4
+  batch_size: 10
+  cache_enabled: true
+  cache_ttl: 3600  # seconds
+
+# Demo Specific Settings
+demo:
+  sample_queries:
+    - "人工知能の最新技術について教えてください"
+    - "気候変動への対策は？"
+    - "量子コンピュータの応用分野"
+    - "CRISPRとゲノム編集"
+    - "再生可能エネルギーの種類"
+  
+  comparison_modes:
+    - "local"
+    - "global"
+    - "drift"
+    
+  interactive_mode: true
+  auto_cleanup: false
