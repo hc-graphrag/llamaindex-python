@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 from dotenv import load_dotenv
 
@@ -53,7 +54,7 @@ def main():
     api_base_url = None  # 初期化
     
     if llm_provider == "bedrock":
-        # AWS Bedrock設定
+        # AWS Bedrock設定 - ANTHROPIC_API_KEYは不要
         bedrock_config = config.get("bedrock", {})
         model_name = bedrock_config.get("model", "anthropic.claude-3-sonnet-20240229-v1:0")
         region_name = bedrock_config.get("region", "us-east-1")
@@ -61,13 +62,14 @@ def main():
         aws_secret_access_key = bedrock_config.get("aws_secret_access_key")
         aws_session_token = bedrock_config.get("aws_session_token")
     else:
-        # Anthropic直接設定（従来の動作）
+        # Anthropic直接設定 - API_KEYが必要
         anthropic_config = config.get("anthropic", {})
         # 環境変数からのみ取得
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             print("Error: ANTHROPIC_API_KEY not found in environment variables")
             print("Please set it using: export ANTHROPIC_API_KEY='your-api-key'")
+            print("Or use AWS Bedrock by setting llm_provider: 'bedrock' in config.yaml")
             sys.exit(1)
         model_name = anthropic_config.get("model", "claude-3-opus-20240229")
         api_base_url = anthropic_config.get("api_base_url")
