@@ -146,7 +146,7 @@
   - 目的: LlamaIndex互換性を確保
   - _要件: 1, 6_
 
-- [ ] 17. エンドツーエンドCLIテスト
+- [x] 17. エンドツーエンドCLIテスト
   - ファイル: tests/test_cli_e2e.py
   - --mode global実行をテスト
   - 出力形式オプションをテスト
@@ -156,7 +156,7 @@
 
 ## フェーズ8: ドキュメント
 
-- [ ] 18. APIドキュメント
+- [x] 18. APIドキュメント
   - ファイル: docs/api/global_search.md
   - GlobalSearchRetriever APIをドキュメント化
   - 設定オプションをドキュメント化
@@ -164,7 +164,7 @@
   - 目的: 開発者の使用を可能にする
   - _要件: All_
 
-- [ ] 19. 使用ガイド
+- [x] 19. 使用ガイド
   - ファイル: docs/guides/global_search_usage.md
   - GLOBAL検索の使い方をドキュメント化
   - CLIコマンド例を提供
