@@ -122,7 +122,7 @@
 
 ## フェーズ7: テスト
 
-- [ ] 14. CommunityContextBuilderの単体テスト
+- [x] 14. CommunityContextBuilderの単体テスト
   - ファイル: tests/test_context_builder.py
   - バッチ作成ロジックをテスト
   - 重み付け検証とエラーハンドリングをテスト
@@ -130,7 +130,7 @@
   - 目的: コンテキスト構築の信頼性を確保
   - _要件: 3, 4_
 
-- [ ] 15. Map-Reduceプロセッサの単体テスト
+- [x] 15. Map-Reduceプロセッサの単体テスト
   - ファイル: tests/test_map_reduce.py
   - MapProcessorのキーポイント抽出をテスト
   - ReduceProcessorのスコアソートをテスト
