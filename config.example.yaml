@@ -5,7 +5,8 @@ llm_provider: "bedrock"  # or "anthropic"
 
 # Anthropic API直接使用時の設定
 anthropic:
-  api_key: "YOUR_ANTHROPIC_API_KEY"
+  # api_key は環境変数 ANTHROPIC_API_KEY から取得されます
+  # export ANTHROPIC_API_KEY='your-api-key' を実行してください
   model: "claude-3-opus-20240620"
   # api_base_url: "https://api.anthropic.com"
 

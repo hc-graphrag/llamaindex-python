@@ -59,7 +59,12 @@ def main():
     else:
         # Anthropic直接設定（従来の動作）
         anthropic_config = config.get("anthropic", {})
-        os.environ["ANTHROPIC_API_KEY"] = anthropic_config.get("api_key")
+        # 環境変数からのみ取得
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            print("Error: ANTHROPIC_API_KEY not found in environment variables")
+            print("Please set it using: export ANTHROPIC_API_KEY='your-api-key'")
+            sys.exit(1)
         model_name = anthropic_config.get("model", "claude-3-opus-20240229")
         api_base_url = anthropic_config.get("api_base_url")
 
