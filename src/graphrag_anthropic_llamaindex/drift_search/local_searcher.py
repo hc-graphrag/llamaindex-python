@@ -158,6 +158,12 @@ class LocalSearcher:
                     if other_id not in visited:
                         visited.add(other_id)
                         
+                        # Load entities if not cached
+                        if self._entities_cache is None:
+                            import os
+                            output_dir = os.environ.get("GRAPHRAG_OUTPUT_DIR", "graphrag_output")
+                            self._entities_cache = load_entities_db(output_dir)
+                        
                         # Find entity data
                         other_data = self._entities_cache[
                             self._entities_cache["id"] == other_id

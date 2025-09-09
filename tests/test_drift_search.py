@@ -130,6 +130,10 @@ class TestLocalSearcher:
     @pytest.mark.asyncio
     async def test_search_entities(self, mock_vector_stores):
         """Test entity search."""
+        # Mock environment variable
+        import os
+        os.environ["GRAPHRAG_OUTPUT_DIR"] = "test_output"
+        
         searcher = LocalSearcher(mock_vector_stores)
         
         # Mock vector store query result
@@ -141,7 +145,7 @@ class TestLocalSearcher:
         mock_vector_stores["entity"].query.return_value = mock_result
         
         # Mock entity data
-        with patch("graphrag_anthropic_llamaindex.drift_search.local_searcher.load_entities") as mock_load:
+        with patch("graphrag_anthropic_llamaindex.drift_search.local_searcher.load_entities_db") as mock_load:
             import pandas as pd
             mock_load.return_value = pd.DataFrame([
                 {
@@ -164,6 +168,10 @@ class TestLocalSearcher:
     @pytest.mark.asyncio
     async def test_expand_context(self, mock_vector_stores):
         """Test context expansion."""
+        # Mock environment variable
+        import os
+        os.environ["GRAPHRAG_OUTPUT_DIR"] = "test_output"
+        
         searcher = LocalSearcher(mock_vector_stores)
         
         # Initial entities
@@ -172,14 +180,14 @@ class TestLocalSearcher:
         ]
         
         # Mock relationships
-        with patch("graphrag_anthropic_llamaindex.drift_search.local_searcher.load_relationships") as mock_rel:
+        with patch("graphrag_anthropic_llamaindex.drift_search.local_searcher.load_relationships_db") as mock_rel:
             import pandas as pd
             mock_rel.return_value = pd.DataFrame([
                 {"source": "1", "target": "2", "type": "related"},
             ])
             
             # Mock entities
-            with patch("graphrag_anthropic_llamaindex.drift_search.local_searcher.load_entities") as mock_ent:
+            with patch("graphrag_anthropic_llamaindex.drift_search.local_searcher.load_entities_db") as mock_ent:
                 mock_ent.return_value = pd.DataFrame([
                     {
                         "id": "2",
@@ -211,6 +219,10 @@ class TestGlobalSearcher:
     @pytest.mark.asyncio
     async def test_search_communities(self, mock_vector_stores):
         """Test community search."""
+        # Mock environment variable
+        import os
+        os.environ["GRAPHRAG_OUTPUT_DIR"] = "test_output"
+        
         searcher = GlobalSearcher(mock_vector_stores)
         
         # Mock vector store query result
@@ -222,7 +234,7 @@ class TestGlobalSearcher:
         mock_vector_stores["community"].query.return_value = mock_result
         
         # Mock community data
-        with patch("graphrag_anthropic_llamaindex.drift_search.global_searcher.load_communities") as mock_load:
+        with patch("graphrag_anthropic_llamaindex.drift_search.global_searcher.load_community_summaries_db") as mock_load:
             import pandas as pd
             mock_load.return_value = pd.DataFrame([
                 {
@@ -344,7 +356,8 @@ class TestResponseGenerator:
     
     def test_create_summary_response(self):
         """Test summary response creation."""
-        generator = ResponseGenerator()
+        # Mock LLM to avoid API key requirement
+        generator = ResponseGenerator(llm=MagicMock())
         
         # Create context
         context = SearchContext(
@@ -363,7 +376,8 @@ class TestResponseGenerator:
     
     def test_validate_response(self):
         """Test response validation."""
-        generator = ResponseGenerator()
+        # Mock LLM to avoid API key requirement
+        generator = ResponseGenerator(llm=MagicMock())
         
         context = SearchContext(query="test query about entities")
         
