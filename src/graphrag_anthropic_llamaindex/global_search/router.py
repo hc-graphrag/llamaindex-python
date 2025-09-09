@@ -81,8 +81,30 @@ class SearchModeRouter(BaseRetriever):
             except Exception as e:
                 logger.warning(f"Global検索の初期化に失敗: {e}")
         
-        # DRIFT検索（将来の実装用）
+        # DRIFT検索
         self.drift_retriever = None
+        if check_mode in [SearchMode.DRIFT, SearchMode.AUTO]:
+            try:
+                from ..drift_search import DriftSearchEngine
+                # vector_storesを集約
+                vector_stores = {}
+                if vector_store_main is not None:
+                    vector_stores["main"] = vector_store_main
+                if vector_store_entity is not None:
+                    vector_stores["entity"] = vector_store_entity
+                if vector_store_community is not None:
+                    vector_stores["community"] = vector_store_community
+                
+                if len(vector_stores) >= 2:  # 最低限2つのストアが必要
+                    self.drift_search_engine = DriftSearchEngine(
+                        config=config,
+                        vector_stores=vector_stores,
+                    )
+                    # DriftSearchEngineをRetrieverとして使用するためのラッパーが必要
+                    self.drift_retriever = self._create_drift_retriever_wrapper()
+                    logger.info("DRIFT検索を初期化しました")
+            except Exception as e:
+                logger.warning(f"DRIFT検索の初期化に失敗: {e}")
     
     def route(self, query: str, mode: Optional[SearchMode] = None) -> SearchMode:
         """
@@ -249,6 +271,55 @@ class SearchModeRouter(BaseRetriever):
             logger.error(f"Error in local search execution: {e}")
             # エラー時は空のリストを返す
             return []
+    
+    def _create_drift_retriever_wrapper(self):
+        """DRIFT検索エンジンをRetrieverとしてラップ"""
+        from llama_index.core.schema import TextNode
+        import asyncio
+        
+        class DriftRetrieverWrapper:
+            def __init__(self, drift_engine):
+                self.drift_engine = drift_engine
+            
+            def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+                """同期的にDRIFT検索を実行"""
+                try:
+                    # 非同期関数を同期的に実行
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    result = loop.run_until_complete(
+                        self.drift_engine.search(
+                            query_bundle.query_str,
+                            streaming=False,
+                            include_context=False
+                        )
+                    )
+                    loop.close()
+                    
+                    # 結果をNodeWithScoreに変換
+                    node = TextNode(text=result, id_="drift_result")
+                    return [NodeWithScore(node=node, score=1.0)]
+                except Exception as e:
+                    logger.error(f"DRIFT検索エラー: {e}")
+                    return []
+            
+            async def _aretrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+                """非同期的にDRIFT検索を実行"""
+                try:
+                    result = await self.drift_engine.search(
+                        query_bundle.query_str,
+                        streaming=False,
+                        include_context=False
+                    )
+                    
+                    # 結果をNodeWithScoreに変換
+                    node = TextNode(text=result, id_="drift_result")
+                    return [NodeWithScore(node=node, score=1.0)]
+                except Exception as e:
+                    logger.error(f"DRIFT検索エラー: {e}")
+                    return []
+        
+        return DriftRetrieverWrapper(self.drift_search_engine)
     
     def get_available_modes(self) -> List[SearchMode]:
         """利用可能な検索モードのリストを返す"""

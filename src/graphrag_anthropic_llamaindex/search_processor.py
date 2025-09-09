@@ -2,8 +2,12 @@ import os
 from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage, Settings
 
 from graphrag_anthropic_llamaindex.vector_store_manager import get_index
+import asyncio
+import logging
 
-def search_index(query, output_dir, llm_params, vector_store=None, entity_vector_store=None, community_vector_store=None, target_index="both"):
+logger = logging.getLogger(__name__)
+
+def search_index(query, output_dir, llm_params, vector_store=None, entity_vector_store=None, community_vector_store=None, target_index="both", mode="auto"):
     """Searches the main text index and optionally the entity index with a given query."""
     main_index = None
     entity_index = None
@@ -78,5 +82,47 @@ def search_index(query, output_dir, llm_params, vector_store=None, entity_vector
         except Exception as e:
             print(f"Error searching community index: {e}")
 
-    if not main_index and not entity_index and not community_index:
+    # DRIFT検索モードの処理
+    if mode == "drift" and vector_store and entity_vector_store and community_vector_store:
+        print("Executing DRIFT search...")
+        try:
+            from .drift_search import DriftSearchEngine
+            
+            # ベクターストアを収集
+            vector_stores = {
+                "main": vector_store,
+                "entity": entity_vector_store,
+                "community": community_vector_store,
+            }
+            
+            # DRIFT検索エンジンを初期化
+            drift_engine = DriftSearchEngine(
+                config=llm_params.get("config", {}),
+                vector_stores=vector_stores,
+                llm=Settings.llm
+            )
+            
+            # DRIFT検索を実行（非同期）
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            response = loop.run_until_complete(
+                drift_engine.search(query, streaming=False, include_context=True)
+            )
+            loop.close()
+            
+            if isinstance(response, tuple):
+                drift_response, context = response
+                print("DRIFT Search Response:", drift_response)
+                print("\n--- DRIFT Search Context ---")
+                print(f"Entities found: {len(context.get('entities', []))}")
+                print(f"Communities found: {len(context.get('communities', []))}")
+                print(f"Text units found: {len(context.get('text_units', []))}")
+            else:
+                print("DRIFT Search Response:", response)
+                
+        except Exception as e:
+            print(f"Error executing DRIFT search: {e}")
+            logger.error(f"DRIFT search error: {e}", exc_info=True)
+    
+    if not main_index and not entity_index and not community_index and mode != "drift":
         print("No index found to search based on the target_index setting.")
