@@ -48,18 +48,23 @@ class SearchModeRouter(BaseRetriever):
         self.config = config
         self.mode = mode if isinstance(mode, SearchMode) else SearchMode(mode)
         
-        # Local検索用のRetriever（今後実装）
+        # Local検索用のRetriever
         self.local_retriever = None
-        # TODO: search_processorとの統合を実装
-        # if vector_store_main is not None:
-        #     try:
-        #         self.local_retriever = LocalSearchRetriever(
-        #             config=config,
-        #             vector_store=vector_store_main,
-        #             entity_vector_store=vector_store_entity
-        #         )
-        #     except Exception as e:
-        #         logger.warning(f"Local検索の初期化に失敗: {e}")
+        # Local検索を有効化（vector_storeがなくても動作可能）
+        # SearchModeが文字列の場合はEnumに変換
+        check_mode = mode if isinstance(mode, SearchMode) else SearchMode(mode)
+        if check_mode in [SearchMode.LOCAL, SearchMode.AUTO]:
+            try:
+                from ..local_search.retriever import LocalSearchRetriever
+                self.local_retriever = LocalSearchRetriever(
+                    config=config,
+                    prompt_style="default",
+                    top_k_entities=10,
+                    max_context_tokens=4000
+                )
+                logger.info("Local検索を初期化しました")
+            except Exception as e:
+                logger.warning(f"Local検索の初期化に失敗: {e}")
         
         # Global検索用のGlobalSearchRetriever
         self.global_retriever = None
@@ -218,9 +223,32 @@ class SearchModeRouter(BaseRetriever):
             return []
     
     def _execute_local_search(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
-        """Local検索を実行（現在は未実装）"""
-        logger.warning("Local検索は現在実装中です。Global検索を使用してください。")
-        return []
+        """Local検索を実行"""
+        from ..local_search.retriever import LocalSearchRetriever
+        
+        try:
+            # LocalSearchRetrieverのインスタンスを作成
+            local_retriever = LocalSearchRetriever(
+                config=self.config,
+                prompt_style="default",
+                top_k_entities=10,
+                max_context_tokens=4000
+            )
+            
+            # 検索を実行
+            results = local_retriever.retrieve(query_bundle)
+            
+            if results:
+                logger.info(f"Local search returned {len(results)} results")
+            else:
+                logger.warning("Local search returned no results")
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error in local search execution: {e}")
+            # エラー時は空のリストを返す
+            return []
     
     def get_available_modes(self) -> List[SearchMode]:
         """利用可能な検索モードのリストを返す"""
