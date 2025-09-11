@@ -14,9 +14,6 @@ anthropic:
 bedrock:
   model: "anthropic.claude-3-sonnet-20240229-v1:0"
   region: "us-east-1"
-  # aws_access_key_id: "YOUR_AWS_ACCESS_KEY"  # 環境変数AWS_ACCESS_KEY_IDを使用する場合は省略可
-  # aws_secret_access_key: "YOUR_AWS_SECRET_KEY"  # 環境変数AWS_SECRET_ACCESS_KEYを使用する場合は省略可
-  # aws_session_token: "YOUR_SESSION_TOKEN"  # セッショントークン（オプション）
 
 embedding_model:
   name: "intfloat/multilingual-e5-small"

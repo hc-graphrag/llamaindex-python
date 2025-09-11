@@ -66,7 +66,6 @@ cp -r "$DEMO_DATA_DIR"/* "$DATA_DIR/"
 echo "  ✓ Copied $(ls -1 "$DEMO_DATA_DIR" | wc -l) documents to data directory"
 
 # Set environment variables
-export GRAPHRAG_OUTPUT_DIR="$OUTPUT_DIR"
 export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
 
 # Check API key

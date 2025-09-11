@@ -58,9 +58,11 @@ def main():
         bedrock_config = config.get("bedrock", {})
         model_name = bedrock_config.get("model", "anthropic.claude-3-sonnet-20240229-v1:0")
         region_name = bedrock_config.get("region", "us-east-1")
-        aws_access_key_id = bedrock_config.get("aws_access_key_id")
-        aws_secret_access_key = bedrock_config.get("aws_secret_access_key")
-        aws_session_token = bedrock_config.get("aws_session_token")
+        # AWS Profile support (環境変数からのみ取得)
+        aws_profile_name = os.environ.get("AWS_PROFILE_NAME")
+        aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
+        aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+        aws_session_token = os.environ.get("AWS_SESSION_TOKEN")
     else:
         # Anthropic直接設定 - API_KEYが必要
         anthropic_config = config.get("anthropic", {})
@@ -103,12 +105,15 @@ def main():
             "model": model_name,
             "region_name": region_name,
         }
-        if aws_access_key_id:
+        # AWS Profileを優先的に使用
+        if aws_profile_name:
+            bedrock_params["profile_name"] = aws_profile_name
+        elif aws_access_key_id and aws_secret_access_key:
+            # Profileが指定されていない場合のみ、明示的な認証情報を使用
             bedrock_params["aws_access_key_id"] = aws_access_key_id
-        if aws_secret_access_key:
             bedrock_params["aws_secret_access_key"] = aws_secret_access_key
-        if aws_session_token:
-            bedrock_params["aws_session_token"] = aws_session_token
+            if aws_session_token:
+                bedrock_params["aws_session_token"] = aws_session_token
         
         llm = Bedrock(**bedrock_params)
         Settings.llm = llm

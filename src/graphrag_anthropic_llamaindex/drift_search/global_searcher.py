@@ -74,8 +74,8 @@ class GlobalSearcher:
             
             # Load community data if not cached
             if self._communities_cache is None:
-                import os
-                output_dir = os.environ.get("GRAPHRAG_OUTPUT_DIR", "graphrag_output")
+                # Use default output_dir from config or fallback
+                output_dir = "graphrag_output"
                 self._communities_cache = load_community_summaries_db(output_dir)
             
             # Convert results to Community objects

@@ -7,8 +7,6 @@ llm_provider: "bedrock"
 bedrock:
   model: "anthropic.claude-3-sonnet-20240229-v1:0"
   region: "us-east-1"
-  # AWS認証情報は環境変数から取得
-  # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN
 
 embedding_model:
   name: "intfloat/multilingual-e5-small"

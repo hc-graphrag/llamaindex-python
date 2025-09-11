@@ -130,9 +130,7 @@ class TestLocalSearcher:
     @pytest.mark.asyncio
     async def test_search_entities(self, mock_vector_stores):
         """Test entity search."""
-        # Mock environment variable
-        import os
-        os.environ["GRAPHRAG_OUTPUT_DIR"] = "test_output"
+        # No longer using GRAPHRAG_OUTPUT_DIR environment variable
         
         searcher = LocalSearcher(mock_vector_stores)
         
@@ -168,9 +166,7 @@ class TestLocalSearcher:
     @pytest.mark.asyncio
     async def test_expand_context(self, mock_vector_stores):
         """Test context expansion."""
-        # Mock environment variable
-        import os
-        os.environ["GRAPHRAG_OUTPUT_DIR"] = "test_output"
+        # No longer using GRAPHRAG_OUTPUT_DIR environment variable
         
         searcher = LocalSearcher(mock_vector_stores)
         
@@ -219,9 +215,7 @@ class TestGlobalSearcher:
     @pytest.mark.asyncio
     async def test_search_communities(self, mock_vector_stores):
         """Test community search."""
-        # Mock environment variable
-        import os
-        os.environ["GRAPHRAG_OUTPUT_DIR"] = "test_output"
+        # No longer using GRAPHRAG_OUTPUT_DIR environment variable
         
         searcher = GlobalSearcher(mock_vector_stores)
         

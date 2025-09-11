@@ -77,8 +77,8 @@ class LocalSearcher:
             
             # Load entity data if not cached
             if self._entities_cache is None:
-                import os
-                output_dir = os.environ.get("GRAPHRAG_OUTPUT_DIR", "graphrag_output")
+                # Use default output_dir from config or fallback
+                output_dir = "graphrag_output"
                 self._entities_cache = load_entities_db(output_dir)
             
             # Convert results to Entity objects
@@ -130,8 +130,8 @@ class LocalSearcher:
         
         # Load relationships if not cached
         if self._relationships_cache is None:
-            import os
-            output_dir = os.environ.get("GRAPHRAG_OUTPUT_DIR", "graphrag_output")
+            # Use default output_dir from config or fallback
+            output_dir = "graphrag_output"
             self._relationships_cache = load_relationships_db(output_dir)
         
         # Track visited entities to avoid cycles
@@ -160,8 +160,8 @@ class LocalSearcher:
                         
                         # Load entities if not cached
                         if self._entities_cache is None:
-                            import os
-                            output_dir = os.environ.get("GRAPHRAG_OUTPUT_DIR", "graphrag_output")
+                            # Use default output_dir from config or fallback
+                            output_dir = "graphrag_output"
                             self._entities_cache = load_entities_db(output_dir)
                         
                         # Find entity data
