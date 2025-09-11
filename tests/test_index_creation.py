@@ -74,25 +74,12 @@ class TestIndexCreation:
             },
             "input_dir": self.test_data_dir if hasattr(self, 'test_data_dir') else "./test_data",
             "output_dir": self.output_dir if hasattr(self, 'output_dir') else "./test_output",
+            # Consolidated vector store configuration
+            # All stores use the same LanceDB database with different tables (hardcoded)
             "vector_store": {
                 "type": "lancedb",
                 "lancedb": {
-                    "uri": "test_lancedb_main",
-                    "table_name": "vectors"
-                }
-            },
-            "entity_vector_store": {
-                "type": "lancedb", 
-                "lancedb": {
-                    "uri": "test_lancedb_entities",
-                    "table_name": "entities_vectors"
-                }
-            },
-            "community_vector_store": {
-                "type": "lancedb",
-                "lancedb": {
-                    "uri": "test_lancedb_communities", 
-                    "table_name": "community_vectors"
+                    "uri": "test_lancedb"  # Single consolidated database
                 }
             },
             "community_detection": {

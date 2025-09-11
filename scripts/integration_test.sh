@@ -6,7 +6,7 @@ echo "==================================================="
 echo "GraphRAG 統合テストスクリプト"
 echo "==================================================="
 
-CONFIG_FILE="config.yaml"
+CONFIG_FILE="config/config.yaml"
 OUTPUT_DIR=$(grep -E "^output_dir:" $CONFIG_FILE | awk '{print $2}' | tr -d '"' | tr -d '/.')
 
 # 1. 既存の出力データをクリーンアップ

@@ -25,7 +25,9 @@
 
 ```
 graphrag-anthropic-llamaindex/
-├── config.example.yaml       # 設定ファイルのテンプレート
+├── config/                   # 設定ファイルディレクトリ
+│   ├── config.example.yaml   # 設定ファイルのテンプレート
+│   └── config_bedrock.yaml   # AWS Bedrock用設定例
 ├── pyproject.toml            # Poetry のプロジェクト設定と依存関係
 ├── README.md                 # このファイル
 ├── data/                     # 処理対象のドキュメントを配置するディレクトリ (input_dir)
@@ -93,13 +95,13 @@ ANTHROPIC_API_KEY=your-anthropic-api-key-here
 
 ### 2. 設定ファイルの作成
 
-`config.example.yaml` を `config.yaml` としてコピーし、必要な設定を更新してください。
+`config/config.example.yaml` を `config/config.yaml` としてコピーし、必要な設定を更新してください。
 
 ```bash
-cp config.example.yaml config.yaml
+cp config/config.example.yaml config/config.yaml
 ```
 
-`config.yaml` の主要な設定項目:
+`config/config.yaml` の主要な設定項目:
 *   `anthropic.model`: 使用するClaudeモデル名（例: `claude-3-opus-20240229`）。
 *   `embedding_model.name`: 埋め込みモデル名（デフォルト: `intfloat/multilingual-e5-small`）。
 *   `input_dir`: 処理対象のドキュメントが置かれるディレクトリ（デフォルト: `./data`）。
@@ -113,7 +115,7 @@ cp config.example.yaml config.yaml
 `input_dir` で指定されたディレクトリ（デフォルト: `data/`）に処理したいドキュメント（TXT, CSV, PDF, DOCX, PPTX, HTML, EMLなど）を配置します。
 
 ```bash
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml add
+poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml add
 ```
 
 *   このコマンドは、`input_dir` 内の新しいドキュメントを読み込み、テキスト抽出、チャンキング、エンティティ・リレーションシップ抽出、コミュニティ検出、コミュニティ要約を行います。
@@ -127,7 +129,7 @@ poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml
 
 ```bash
 bash
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml search "あなたのクエリ" --target-index <インデックスタイプ>
+poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "あなたのクエリ" --target-index <インデックスタイプ>
 ```
 
 `<インデックスタイプ>` には以下のいずれかを指定します。
@@ -141,19 +143,19 @@ poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml
 
 *   **メインテキストインデックスの検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml search "AIの最新動向について教えてください"
+    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "AIの最新動向について教えてください"
     ```
 *   **エンティティインデックスの検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml search "Acme CorpのCEOは誰ですか？" --target-index entity
+    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "Acme CorpのCEOは誰ですか？" --target-index entity
     ```
 *   **コミュニティ要約インデックスの検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml search "サステナブルテクノロジーに関するコミュニティはありますか？" --target-index community
+    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "サステナブルテクノロジーに関するコミュニティはありますか？" --target-index community
     ```
 *   **すべてのインデックスを検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml search "気候変動に関する主要な研究機関は？"
+    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "気候変動に関する主要な研究機関は？"
     ```
 
 ## デモスクリプトの実行

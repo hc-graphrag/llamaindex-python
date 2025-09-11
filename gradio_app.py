@@ -1,19 +1,20 @@
 import os
-import asyncio
+import json
 import logging
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 import gradio as gr
+from dotenv import load_dotenv
 
 from llama_index.llms.anthropic import Anthropic
+from llama_index.llms.bedrock import Bedrock
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core import Settings
 from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.schema import QueryBundle
 
 from src.graphrag_anthropic_llamaindex.config_manager import load_config
 from src.graphrag_anthropic_llamaindex.vector_store_manager import get_vector_store
-from src.graphrag_anthropic_llamaindex.document_processor import add_documents
-from src.graphrag_anthropic_llamaindex.search_processor import search_index
-from src.graphrag_anthropic_llamaindex.file_filter import FileFilter
+from src.graphrag_anthropic_llamaindex.global_search import SearchModeRouter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,30 +22,57 @@ logger = logging.getLogger(__name__)
 
 class GraphRAGApp:
     def __init__(self):
+        # Load environment variables from .env file
+        load_dotenv()
         self.config = None
         self.llm_params = {}
         self.vector_stores = {}
-        self.file_filter = None
         self.is_initialized = False
+        self.llm_provider = None
     
-    def initialize_config(self, config_path: str = "config.yaml") -> str:
+    def initialize_config(self, config_path: str = "config/config.yaml") -> str:
         try:
             self.config = load_config(config_path)
             if not self.config:
                 return "❌ 設定ファイルの読み込みに失敗しました"
             
-            # Initialize Anthropic settings
-            anthropic_config = self.config.get("anthropic", {})
-            if not anthropic_config.get("api_key"):
-                return "❌ Anthropic APIキーが設定されていません"
-                
-            os.environ["ANTHROPIC_API_KEY"] = anthropic_config["api_key"]
-            model_name = anthropic_config.get("model", "claude-3-opus-20240229")
-            api_base_url = anthropic_config.get("api_base_url")
+            # LLMプロバイダーの設定を取得
+            self.llm_provider = self.config.get("llm_provider", "anthropic")
             
-            self.llm_params = {"model": model_name}
-            if api_base_url:
-                self.llm_params["api_base_url"] = api_base_url
+            if self.llm_provider == "bedrock":
+                # AWS Bedrock設定 - ANTHROPIC_API_KEYは不要
+                bedrock_config = self.config.get("bedrock", {})
+                model_name = bedrock_config.get("model", "anthropic.claude-3-sonnet-20240229-v1:0")
+                region_name = bedrock_config.get("region", "us-east-1")
+                aws_access_key_id = bedrock_config.get("aws_access_key_id")
+                aws_secret_access_key = bedrock_config.get("aws_secret_access_key")
+                aws_session_token = bedrock_config.get("aws_session_token")
+                
+                # Bedrock用のLLMパラメータ
+                self.llm_params = {
+                    "model": model_name,
+                    "region_name": region_name,
+                }
+                if aws_access_key_id:
+                    self.llm_params["aws_access_key_id"] = aws_access_key_id
+                if aws_secret_access_key:
+                    self.llm_params["aws_secret_access_key"] = aws_secret_access_key
+                if aws_session_token:
+                    self.llm_params["aws_session_token"] = aws_session_token
+            else:
+                # Anthropic直接設定 - API_KEYが必要
+                anthropic_config = self.config.get("anthropic", {})
+                # 環境変数からのみ取得
+                api_key = os.environ.get("ANTHROPIC_API_KEY")
+                if not api_key:
+                    return "❌ ANTHROPIC_API_KEY が環境変数に設定されていません。\nexport ANTHROPIC_API_KEY='your-api-key' で設定するか、\nAWS Bedrock を使用する場合は config/config.yaml で llm_provider: 'bedrock' を設定してください。"
+                    
+                model_name = anthropic_config.get("model", "claude-3-opus-20240229")
+                api_base_url = anthropic_config.get("api_base_url")
+                
+                self.llm_params = {"model": model_name}
+                if api_base_url:
+                    self.llm_params["api_base_url"] = api_base_url
             
             # Initialize vector stores
             self.vector_stores = {
@@ -64,61 +92,30 @@ class GraphRAGApp:
             chunk_overlap = chunking_config.get("chunk_overlap", 20)
             node_parser = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
             
-            # Configure Settings
-            llm = Anthropic(**self.llm_params)
-            Settings.llm = llm
+            # Configure Settings based on provider
+            if self.llm_provider == "bedrock":
+                llm = Bedrock(**self.llm_params)
+                Settings.llm = llm
+                logger.info(f"Using AWS Bedrock with model: {model_name}")
+            else:
+                llm = Anthropic(**self.llm_params)
+                Settings.llm = llm
+                logger.info(f"Using Anthropic API with model: {model_name}")
+            
             Settings.embed_model = embed_model
             Settings.node_parser = node_parser
             
-            # Initialize file filter
-            ignore_patterns = self.config.get("ignore_patterns", [])
-            self.file_filter = FileFilter(ignore_patterns)
-            
             self.is_initialized = True
             logger.info("Configuration initialized successfully")
-            return "✅ 設定が正常に読み込まれました"
+            return f"✅ 設定が正常に読み込まれました\nLLMプロバイダー: {self.llm_provider}\nモデル: {model_name}"
             
         except Exception as e:
             error_msg = f"❌ 設定の初期化に失敗しました: {str(e)}"
             logger.error(error_msg)
             return error_msg
     
-    def add_documents_sync(self, input_dir: str, output_dir: str, progress=gr.Progress()) -> str:
-        if not self.is_initialized:
-            return "❌ 設定が初期化されていません。まず設定を読み込んでください。"
-        
-        if not input_dir or not output_dir:
-            return "❌ 入力ディレクトリと出力ディレクトリを指定してください。"
-        
-        try:
-            progress(0, desc="ドキュメント処理を開始...")
-            logger.info(f"Adding documents: input_dir={input_dir}, output_dir={output_dir}")
-            
-            community_detection_config = self.config.get("community_detection", {})
-            
-            progress(0.5, desc="ドキュメントを処理中...")
-            add_documents(
-                input_dir,
-                output_dir,
-                self.vector_stores["main"],
-                self.vector_stores["entity"],
-                self.vector_stores["community"],
-                community_detection_config,
-                True,  # use_archive_reader
-                self.file_filter
-            )
-            
-            progress(1.0, desc="完了")
-            result = f"✅ ドキュメントが正常に追加されました\n入力: {input_dir}\n出力: {output_dir}"
-            logger.info("Documents added successfully")
-            return result
-            
-        except Exception as e:
-            error_msg = f"❌ ドキュメント追加に失敗しました: {str(e)}"
-            logger.error(error_msg)
-            return error_msg
     
-    def search_chat(self, message: str, history: list, search_method: str, output_dir: str, progress=gr.Progress()) -> tuple:
+    def search_chat(self, message: str, history: list, search_mode: str, response_type: str, output_format: str, min_community_rank: int, progress=gr.Progress()) -> tuple:
         if not self.is_initialized:
             error_msg = "❌ 設定が初期化されていません。まず設定タブで設定を読み込んでください。"
             history.append([message, error_msg])
@@ -129,49 +126,73 @@ class GraphRAGApp:
             history.append([message, error_msg])
             return "", history
         
-        if not output_dir:
-            error_msg = "❌ 出力ディレクトリを指定してください。"
-            history.append([message, error_msg])
-            return "", history
-        
         try:
             progress(0, desc="検索を開始...")
-            logger.info(f"Searching: query='{message}', search_method={search_method}")
+            logger.info(f"Searching: query='{message}', search_mode={search_mode}, response_type={response_type}")
             
             progress(0.5, desc="検索中...")
-            result = search_index(
-                message,
-                output_dir,
-                self.llm_params,
-                self.vector_stores["main"],
-                self.vector_stores["entity"],
-                self.vector_stores["community"],
-                search_method
+            
+            # Use the new SearchModeRouter for unified search interface
+            router = SearchModeRouter(
+                config=self.config,
+                mode=search_mode,
+                vector_store_main=self.vector_stores.get("main"),
+                vector_store_entity=self.vector_stores.get("entity"),
+                vector_store_community=self.vector_stores.get("community"),
+                response_type=response_type,
+                min_community_rank=min_community_rank,
+                output_format=output_format
             )
+            
+            # Execute search
+            query_bundle = QueryBundle(query_str=message)
+            results = router._retrieve(query_bundle)
             
             progress(1.0, desc="完了")
             logger.info("Search completed successfully")
             
-            # Format the response for chat - Anthropic Claude style
-            response = f"🔍 **検索方法**: {self._get_search_method_name(search_method)}\n\n{result}"
-            history.append([message, response])
+            # Format results
+            if results:
+                if output_format == "json":
+                    # JSON形式で結果を整形
+                    result_data = []
+                    for i, node_with_score in enumerate(results):
+                        result_data.append({
+                            "score": node_with_score.score,
+                            "text": node_with_score.node.text,
+                            "metadata": node_with_score.node.metadata
+                        })
+                    response = f"🔍 **検索モード**: {self._get_search_mode_name(search_mode)}\n\n```json\n{json.dumps(result_data, ensure_ascii=False, indent=2)}\n```"
+                else:
+                    # Markdown形式で結果を整形
+                    main_result = results[0].node.text if results else "結果が見つかりませんでした。"
+                    response = f"🔍 **検索モード**: {self._get_search_mode_name(search_mode)}\n\n{main_result}"
+                    
+                    # 追加のキーポイントがある場合
+                    if len(results) > 1:
+                        response += "\n\n### 📌 キーポイント\n"
+                        for i, node_with_score in enumerate(results[1:], 1):
+                            response += f"\n**ポイント {i}** (スコア: {node_with_score.score:.2f})\n{node_with_score.node.text}\n"
+            else:
+                response = f"🔍 **検索モード**: {self._get_search_mode_name(search_mode)}\n\n結果が見つかりませんでした。"
             
+            history.append([message, response])
             return "", history
             
         except Exception as e:
             error_msg = f"❌ 検索に失敗しました: {str(e)}"
-            logger.error(error_msg)
+            logger.error(error_msg, exc_info=True)
             history.append([message, error_msg])
             return "", history
     
-    def _get_search_method_name(self, search_method: str) -> str:
-        method_names = {
-            "both": "統合検索（エンティティ + コミュニティ）",
-            "main": "メイン検索（基本的な意味検索）",
-            "entity": "エンティティ検索（固有名詞・概念中心）",
-            "community": "コミュニティ検索（関連性・グループ中心）"
+    def _get_search_mode_name(self, search_mode: str) -> str:
+        mode_names = {
+            "local": "ローカル検索（詳細・高精度）",
+            "global": "グローバル検索（包括的・要約）",
+            "drift": "DRIFT検索（次世代・実験的）",
+            "auto": "自動選択（クエリに最適な方法を自動選択）"
         }
-        return method_names.get(search_method, search_method)
+        return mode_names.get(search_mode, search_mode)
 
 # Global app instance
 app = GraphRAGApp()
@@ -179,20 +200,20 @@ app = GraphRAGApp()
 def create_interface():
     with gr.Blocks(title="GraphRAG Anthropic LlamaIndex", theme=gr.themes.Soft()) as interface:
         gr.Markdown("# 🔗 GraphRAG Anthropic LlamaIndex Web App")
-        gr.Markdown("CLIツールのためのシンプルなWebインターフェース")
+        gr.Markdown("CLIで作成されたインデックスを検索するためのWebインターフェース")
         
         with gr.Tab("⚙️ 設定"):
             gr.Markdown("### 設定ファイルの読み込み")
             config_path = gr.Textbox(
                 label="設定ファイルパス",
-                value="config.yaml",
-                placeholder="config.yamlファイルのパスを入力"
+                value="config/config.yaml",
+                placeholder="config/config.yamlファイルのパスを入力"
             )
             config_btn = gr.Button("設定を読み込み", variant="primary")
             config_status = gr.Textbox(
                 label="設定状況",
                 interactive=False,
-                lines=3
+                lines=5
             )
             
             config_btn.click(
@@ -201,55 +222,51 @@ def create_interface():
                 outputs=[config_status]
             )
         
-        with gr.Tab("📄 ドキュメント追加"):
-            gr.Markdown("### ドキュメントをインデックスに追加")
-            
-            with gr.Row():
-                input_dir = gr.Textbox(
-                    label="入力ディレクトリ",
-                    value="./data",
-                    placeholder="ドキュメントが格納されているディレクトリ"
-                )
-                output_dir = gr.Textbox(
-                    label="出力ディレクトリ",
-                    value="./graphrag_output",
-                    placeholder="処理結果の出力先ディレクトリ"
-                )
-            
-            add_btn = gr.Button("ドキュメントを追加", variant="primary")
-            add_result = gr.Textbox(
-                label="処理結果",
-                interactive=False,
-                lines=5
-            )
-            
-            add_btn.click(
-                fn=app.add_documents_sync,
-                inputs=[input_dir, output_dir],
-                outputs=[add_result]
-            )
-        
         with gr.Tab("🔍 検索"):
             gr.Markdown("### 💬 チャット形式で検索")
             
             with gr.Row():
-                with gr.Column(scale=3):
-                    search_output_dir = gr.Textbox(
-                        label="出力ディレクトリ",
-                        value="./graphrag_output",
-                        placeholder="インデックスが格納されているディレクトリ"
+                with gr.Column(scale=2):
+                    search_mode = gr.Dropdown(
+                        label="検索モード",
+                        choices=[
+                            ("グローバル検索（包括的）", "global"),
+                            ("ローカル検索（詳細）", "local"), 
+                            ("DRIFT検索（実験的）", "drift"),
+                            ("自動選択", "auto")
+                        ],
+                        value="global",
+                        info="検索モードを選択してください"
                     )
                 with gr.Column(scale=2):
-                    search_method = gr.Dropdown(
-                        label="検索方法",
+                    response_type = gr.Dropdown(
+                        label="回答タイプ",
                         choices=[
-                            ("統合検索（推奨）", "both"),
-                            ("メイン検索", "main"), 
-                            ("エンティティ検索", "entity"),
-                            ("コミュニティ検索", "community")
+                            ("複数段落", "multiple paragraphs"),
+                            ("単一段落", "single paragraph"),
+                            ("リスト形式", "list"),
+                            ("要点のみ", "key points")
                         ],
-                        value="both",
-                        info="検索の方法を選択してください"
+                        value="multiple paragraphs",
+                        info="回答の形式を選択"
+                    )
+            
+            with gr.Row():
+                with gr.Column(scale=2):
+                    output_format = gr.Radio(
+                        label="出力形式",
+                        choices=[("Markdown", "markdown"), ("JSON", "json")],
+                        value="markdown",
+                        info="結果の表示形式"
+                    )
+                with gr.Column(scale=2):
+                    min_community_rank = gr.Slider(
+                        label="最小コミュニティランク",
+                        minimum=0,
+                        maximum=5,
+                        value=0,
+                        step=1,
+                        info="0 = すべてのレベル"
                     )
             
             # Chat interface
@@ -274,8 +291,8 @@ def create_interface():
             clear_btn = gr.Button("チャット履歴をクリア", variant="secondary")
             
             # Event handlers
-            def send_message(message, history, method, output_dir):
-                return app.search_chat(message, history, method, output_dir)
+            def send_message(message, history, mode, response_type, output_format, min_rank):
+                return app.search_chat(message, history, mode, response_type, output_format, min_rank)
             
             def clear_chat():
                 return []
@@ -283,13 +300,13 @@ def create_interface():
             # Send message on button click or Enter
             send_btn.click(
                 fn=send_message,
-                inputs=[msg, chatbot, search_method, search_output_dir],
+                inputs=[msg, chatbot, search_mode, response_type, output_format, min_community_rank],
                 outputs=[msg, chatbot]
             )
             
             msg.submit(
                 fn=send_message,
-                inputs=[msg, chatbot, search_method, search_output_dir],
+                inputs=[msg, chatbot, search_mode, response_type, output_format, min_community_rank],
                 outputs=[msg, chatbot]
             )
             
@@ -303,54 +320,74 @@ def create_interface():
             gr.Markdown("""
             ## 📖 使用手順
             
-            1. **設定タブ**: まず設定ファイル（config.yaml）を読み込んでください
-            2. **ドキュメント追加タブ**: ドキュメントをインデックスに追加します
-            3. **検索タブ**: チャット形式で追加されたドキュメントから検索を実行します
-            
-            ## 🔍 検索方法の説明
-            
-            - **統合検索（推奨）**: エンティティとコミュニティ検索を組み合わせた総合的な検索
-            - **メイン検索**: 基本的な意味検索（単語の類似性ベース）
-            - **エンティティ検索**: 固有名詞や重要な概念に焦点を当てた検索
-            - **コミュニティ検索**: 関連性の高いトピックグループから検索
-            
-            ## 📁 ディレクトリ構造
-            
+            ### 1️⃣ インデックスの作成（CLIで実行）
+            ```bash
+            # インデックスを作成
+            python -m graphrag_anthropic_llamaindex add
             ```
-            ./data/              # 入力ドキュメント
-            ./graphrag_output/   # 処理結果・インデックス
-            config.yaml          # 設定ファイル
-            ```
+            
+            ### 2️⃣ Webアプリで検索
+            1. **設定タブ**: 設定ファイル（config.yaml）を読み込む
+            2. **検索タブ**: チャット形式でインデックスから検索を実行
+            
+            ## 🔍 検索モードの説明
+            
+            - **グローバル検索**: 包括的な要約と洞察を提供（推奨）
+            - **ローカル検索**: エンティティに基づいた詳細な検索
+            - **DRIFT検索**: 次世代の実験的な検索方法
+            - **自動選択**: クエリに基づいて最適な方法を自動選択
+            
+            ## 📝 回答タイプ
+            
+            - **複数段落**: 詳細な説明を含む包括的な回答
+            - **単一段落**: 簡潔にまとめられた回答
+            - **リスト形式**: 箇条書きで整理された回答
+            - **要点のみ**: 重要なポイントのみを抽出
             
             ## ⚙️ 設定ファイル例
             
             ```yaml
-            anthropic:
-              api_key: "your-api-key"
-              model: "claude-3-opus-20240229"
+            # LLMプロバイダー設定
+            llm_provider: "anthropic"  # または "bedrock"
             
+            # Anthropic API設定
+            anthropic:
+              model: "claude-3-opus-20240229"
+              # api_keyは環境変数ANTHROPIC_API_KEYから読み込み
+            
+            # または AWS Bedrock設定
+            bedrock:
+              model: "anthropic.claude-3-sonnet-20240229-v1:0"
+              region: "us-east-1"
+            
+            # 入出力ディレクトリ
             input_dir: "./data"
             output_dir: "./graphrag_output"
             
+            # 埋め込みモデル
             embedding_model:
               name: "intfloat/multilingual-e5-small"
             
+            # チャンキング設定
             chunking:
               chunk_size: 1024
               chunk_overlap: 20
-            
-            ignore_patterns:
-              - "*.tmp"
-              - ".git/*"
             ```
             
             ## 💬 チャット検索の使い方
             
-            1. 検索方法を選択（通常は「統合検索」がおすすめ）
-            2. チャット欄に自然な日本語で質問を入力
-            3. Enterキーまたは「送信」ボタンで検索実行
-            4. 結果がチャット形式で表示されます
-            5. 続けて追加の質問も可能です
+            1. 検索モードを選択（通常は「グローバル検索」がおすすめ）
+            2. 回答タイプと出力形式を選択
+            3. チャット欄に自然な日本語で質問を入力
+            4. Enterキーまたは「送信」ボタンで検索実行
+            5. 結果がチャット形式で表示されます
+            6. 続けて追加の質問も可能です
+            
+            ## 🔧 トラブルシューティング
+            
+            - **API Key エラー**: 環境変数 `ANTHROPIC_API_KEY` を設定するか、AWS Bedrockを使用
+            - **インデックスが見つからない**: CLIで `python -m graphrag_anthropic_llamaindex add` を実行
+            - **検索結果が空**: 検索モードを変更して再試行
             """)
     
     return interface

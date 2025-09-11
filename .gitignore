@@ -6,7 +6,7 @@ __pycache__/
 # Environments
 .env
 .venv
-config.yaml
+config/config.yaml
 !scripts/demo_dataset/config.yaml
 
 # Poetry

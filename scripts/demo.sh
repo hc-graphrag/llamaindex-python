@@ -18,7 +18,7 @@ echo "インストール完了。"
 # 2. データの追加と処理
 echo -e "\n2. ドキュメントの追加と処理 (エンティティ/リレーションシップ抽出、コミュニティ検出/要約)..."
 echo "   (初回実行時はLLM呼び出しとモデルダウンロードに時間がかかります)"
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml add
+poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml add
 if [ $? -ne 0 ]; then
     echo "エラー: ドキュメントの追加処理に失敗しました。"
     exit 1
@@ -32,7 +32,7 @@ echo -e "\n3. 検索機能のデモンストレーション:"
 # 3.1. メインテキストインデックスの検索
 echo -e "\n--- 3.1. メインテキストインデックスの検索 ---"
 echo "クエリ: \"AIの最新動向について教えてください\""
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config config.yaml search "AIの最新動向について教えてください" --target-index main
+poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "AIの最新動向について教えてください" --target-index main
 
 # 3.2. エンティティインデックスの検索
 echo -e "\n--- 3.2. エンティティインデックスの検索 ---"

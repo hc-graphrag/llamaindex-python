@@ -37,23 +37,16 @@ ignore_patterns:
   - ".env"
   - ".env.*"
 
+# Vector Store Configuration
+# All vector stores are consolidated into a single LanceDB database
+# with different tables (hardcoded) for each store type:
+# - main: "vectors" table
+# - entity: "entities_vectors" table
+# - community: "community_vectors" table
 vector_store:
   type: "lancedb"
   lancedb:
-    uri: "lancedb_main"
-    table_name: "vectors"
-
-community_vector_store:
-  type: "lancedb"
-  lancedb:
-    uri: "lancedb_communities"
-    table_name: "community_vectors"
-
-entity_vector_store:
-  type: "lancedb"
-  lancedb:
-    uri: "lancedb_entities"
-    table_name: "entities_vectors"
+    uri: "lancedb" # Single consolidated database for all stores
 
 community_detection:
   max_cluster_size: 10

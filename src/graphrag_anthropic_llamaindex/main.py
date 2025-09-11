@@ -22,7 +22,7 @@ def main():
     load_dotenv()
     
     parser = argparse.ArgumentParser(description="A CLI for GraphRAG with LlamaIndex and Anthropic.")
-    parser.add_argument("--config", default="config.yaml", help="Path to the configuration file.")
+    parser.add_argument("--config", default="config/config.yaml", help="Path to the configuration file.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # 'add' command
@@ -69,7 +69,7 @@ def main():
         if not api_key:
             print("Error: ANTHROPIC_API_KEY not found in environment variables")
             print("Please set it using: export ANTHROPIC_API_KEY='your-api-key'")
-            print("Or use AWS Bedrock by setting llm_provider: 'bedrock' in config.yaml")
+            print("Or use AWS Bedrock by setting llm_provider: 'bedrock' in config/config.yaml")
             sys.exit(1)
         model_name = anthropic_config.get("model", "claude-3-opus-20240229")
         api_base_url = anthropic_config.get("api_base_url")
