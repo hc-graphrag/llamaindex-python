@@ -27,7 +27,27 @@ import fsspec
 import hashlib
 from pathlib import Path
 
+def validate_relationship(relationship):
+    """
+    Validate that a relationship object has the required fields.
 
+    Args:
+        relationship: Dictionary representing a relationship
+
+    Returns:
+        bool: True if valid, False otherwise
+    """
+    if not isinstance(relationship, dict):
+        return False
+
+    required_fields = ['source', 'target']
+    for field in required_fields:
+        if field not in relationship:
+            return False
+        if not relationship[field] or not str(relationship[field]).strip():
+            return False
+
+    return True
 
 def add_documents(
     input_dir,
@@ -130,7 +150,12 @@ def add_documents(
                         extracted_entities_list.append(entity)
                         entity_documents.append(Document(text=entity.get('name', ''), extra_info=entity))
                     for relationship in result.get('relationships', []):
-                        extracted_relationships_list.append(relationship)
+                        # Validate relationship structure
+                        if validate_relationship(relationship):
+                            extracted_relationships_list.append(relationship)
+                        else:
+                            print(f"  Warning: Skipping invalid relationship: {relationship}")
+                            print(f"  Expected keys: ['source', 'target'], Found keys: {list(relationship.keys()) if isinstance(relationship, dict) else 'Not a dict'}")
                 print(f"  Processed chunk {i+1}/{len(nodes)}")
             except Exception as e:
                 print(f"  Error extracting from chunk {i+1}: {e}")
@@ -156,8 +181,17 @@ def add_documents(
         if extracted_relationships_list and community_detection_config:
             print("Performing community detection...")
             graph = nx.Graph()
+
+            # Validate relationships before adding to graph
+            valid_relationships = []
             for rel in extracted_relationships_list:
-                graph.add_edge(rel['source'], rel['target'])
+                if validate_relationship(rel):
+                    valid_relationships.append(rel)
+                    graph.add_edge(rel['source'], rel['target'])
+                else:
+                    print(f"  Warning: Skipping invalid relationship for graph: {rel}")
+
+            print(f"  Added {len(valid_relationships)} valid relationships to graph")
             
             max_cluster_size = community_detection_config.get("max_cluster_size", 10)
             use_lcc = community_detection_config.get("use_lcc", True)
