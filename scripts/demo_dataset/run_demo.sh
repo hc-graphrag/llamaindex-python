@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DEMO_DATA_DIR="$SCRIPT_DIR/documents"
-OUTPUT_DIR="$PROJECT_ROOT/demo_output"
+# OUTPUT_DIR will be determined from config.yaml, not hardcoded
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  GraphRAG DRIFT Search Demo${NC}"
@@ -49,27 +49,39 @@ if [[ -z "$VIRTUAL_ENV" ]]; then
     fi
 fi
 
-# Check if demo output already exists
-SKIP_INDEXING=false
-if [ -d "$OUTPUT_DIR" ] && [ -f "$OUTPUT_DIR/entities.parquet" ] && [ -f "$OUTPUT_DIR/relationships.parquet" ]; then
-    print_info "Existing demo output found. Checking if indexing can be skipped..."
+# Get output directory from config after determining which config file to use
+get_output_dir() {
+    local config_file="$1"
+    if [ -f "$config_file" ]; then
+        # Extract output_dir from config, default to "./demo_output" relative to config location
+        python -c "
+import yaml
+import os
+from pathlib import Path
 
-    # Check if the output contains valid data
-    ENTITY_COUNT=$(python -c "import pandas as pd; try: print(len(pd.read_parquet('$OUTPUT_DIR/entities.parquet'))); except: print(0)" 2>/dev/null || echo "0")
-    REL_COUNT=$(python -c "import pandas as pd; try: print(len(pd.read_parquet('$OUTPUT_DIR/relationships.parquet'))); except: print(0)" 2>/dev/null || echo "0")
+try:
+    config_path = Path('$config_file').resolve()
+    config_dir = config_path.parent
 
-    if [ "$ENTITY_COUNT" -gt 0 ] && [ "$REL_COUNT" -gt 0 ]; then
-        print_info "Valid index found with $ENTITY_COUNT entities and $REL_COUNT relationships"
-        print_info "Skipping document ingestion and using existing index..."
-        SKIP_INDEXING=true
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    output_dir = config.get('output_dir', './demo_output')
+
+    # Resolve relative to config file location
+    if not os.path.isabs(output_dir):
+        resolved_path = config_dir / output_dir
+        print(str(resolved_path.resolve()))
+    else:
+        print(output_dir)
+
+except Exception as e:
+    print('$SCRIPT_DIR/demo_output')
+"
     else
-        print_info "Invalid or empty index found. Will rebuild..."
-        rm -rf "$OUTPUT_DIR"
+        echo "$SCRIPT_DIR/demo_output"
     fi
-fi
-
-# Create output directory if needed
-mkdir -p "$OUTPUT_DIR"
+}
 
 # Copy demo documents to data directory
 print_step 1 "Preparing demo documents..."
@@ -104,6 +116,32 @@ elif [ -f "$CONFIG_FILE" ]; then
     fi
 fi
 
+# Determine output directory from config
+OUTPUT_DIR=$(get_output_dir "$CONFIG_FILE")
+print_info "Output directory resolved to: $OUTPUT_DIR"
+
+# Check if demo output already exists
+SKIP_INDEXING=false
+if [ -d "$OUTPUT_DIR" ] && [ -f "$OUTPUT_DIR/entities.parquet" ] && [ -f "$OUTPUT_DIR/relationships.parquet" ]; then
+    print_info "Existing demo output found. Checking if indexing can be skipped..."
+
+    # Check if the output contains valid data
+    ENTITY_COUNT=$(python -c "import pandas as pd; try: print(len(pd.read_parquet('$OUTPUT_DIR/entities.parquet'))); except: print(0)" 2>/dev/null || echo "0")
+    REL_COUNT=$(python -c "import pandas as pd; try: print(len(pd.read_parquet('$OUTPUT_DIR/relationships.parquet'))); except: print(0)" 2>/dev/null || echo "0")
+
+    if [ "$ENTITY_COUNT" -gt 0 ] && [ "$REL_COUNT" -gt 0 ]; then
+        print_info "Valid index found with $ENTITY_COUNT entities and $REL_COUNT relationships"
+        print_info "Skipping document ingestion and using existing index..."
+        SKIP_INDEXING=true
+    else
+        print_info "Invalid or empty index found. Will rebuild..."
+        rm -rf "$OUTPUT_DIR"
+    fi
+fi
+
+# Create output directory if needed
+mkdir -p "$OUTPUT_DIR"
+
 # Check API key only if using Anthropic provider directly
 if [ "$LLM_PROVIDER" = "anthropic" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
     print_error "ANTHROPIC_API_KEY is required when using Anthropic provider."
@@ -120,7 +158,7 @@ if [ "$SKIP_INDEXING" = false ]; then
     print_step 2 "Ingesting documents and building knowledge graph..."
     echo ""
     cd "$PROJECT_ROOT"
-    python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" add "$DATA_DIR" --output-dir "$OUTPUT_DIR"
+    python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" add "$DATA_DIR"
 
     # Wait for indexing to complete
     sleep 2
@@ -170,8 +208,7 @@ run_search() {
     echo "---"
     
     python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" search "$query" \
-        --mode "$mode" \
-        --output-dir "$OUTPUT_DIR" 2>/dev/null | head -20
+        --mode "$mode" 2>/dev/null | head -20
     
     echo ""
     echo "=========================================="
@@ -197,8 +234,7 @@ echo ""
 for mode in "${modes[@]}"; do
     echo -e "${BLUE}━━━ ${mode^^} Search ━━━${NC}"
     python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" search "$SAMPLE_QUERY" \
-        --mode "$mode" \
-        --output-dir "$OUTPUT_DIR" 2>/dev/null | head -15
+        --mode "$mode" 2>/dev/null | head -15
     echo ""
 done
 
@@ -219,8 +255,7 @@ while true; do
     if [ -n "$user_query" ]; then
         echo ""
         python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" search "$user_query" \
-            --mode "drift" \
-            --output-dir "$OUTPUT_DIR"
+            --mode "drift"
         echo ""
     fi
 done
@@ -230,7 +265,7 @@ print_step 7 "Demo completed!"
 echo ""
 print_info "Output files are saved in: $OUTPUT_DIR"
 print_info "To run searches manually, use:"
-echo "    python -m graphrag_anthropic_llamaindex.main --config $CONFIG_FILE search \"your query\" --mode drift --output-dir $OUTPUT_DIR"
+echo "    python -m graphrag_anthropic_llamaindex.main --config $CONFIG_FILE search \"your query\" --mode drift"
 echo ""
 
 echo -e "${GREEN}✓ Demo completed successfully!${NC}"
