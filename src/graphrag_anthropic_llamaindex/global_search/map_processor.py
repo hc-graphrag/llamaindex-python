@@ -154,9 +154,12 @@ class MapProcessor:
         loop = asyncio.get_event_loop()
         
         def _sync_call():
+            # Use proper LlamaIndex ChatMessage format for Bedrock compatibility
+            from llama_index.core.llms import ChatMessage, MessageRole
+            
             messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
+                ChatMessage(role=MessageRole.USER, content=user_prompt)
             ]
             response = self.llm.chat(messages)
             return str(response)

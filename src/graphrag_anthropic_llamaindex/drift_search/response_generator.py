@@ -86,16 +86,18 @@ class ResponseGenerator:
             # Format context for prompt
             formatted_context = self.context_builder.format_context_for_prompt(context)
             
-            # Build messages
+            # Build messages using proper LlamaIndex ChatMessage format
+            from llama_index.core.llms import ChatMessage, MessageRole
+            
             messages = [
-                {"role": "system", "content": self.system_prompt},
-                {
-                    "role": "user",
-                    "content": self.user_prompt_template.format(
+                ChatMessage(role=MessageRole.SYSTEM, content=self.system_prompt),
+                ChatMessage(
+                    role=MessageRole.USER,
+                    content=self.user_prompt_template.format(
                         query=context.query,
                         context=formatted_context,
                     ),
-                },
+                ),
             ]
             
             # Generate response
@@ -118,7 +120,7 @@ class ResponseGenerator:
             
         except Exception as e:
             logger.error(f"Error generating response: {e}", exc_info=True)
-            return f"Ошибка при генерации ответа: {str(e)}"
+            return f"エラーが発生しました: {str(e)}"
     
     async def stream_response(
         self,
@@ -143,16 +145,18 @@ class ResponseGenerator:
             # Format context for prompt
             formatted_context = self.context_builder.format_context_for_prompt(context)
             
-            # Build messages
+            # Build messages using proper LlamaIndex ChatMessage format
+            from llama_index.core.llms import ChatMessage, MessageRole
+            
             messages = [
-                {"role": "system", "content": self.system_prompt},
-                {
-                    "role": "user",
-                    "content": self.user_prompt_template.format(
+                ChatMessage(role=MessageRole.SYSTEM, content=self.system_prompt),
+                ChatMessage(
+                    role=MessageRole.USER,
+                    content=self.user_prompt_template.format(
                         query=context.query,
                         context=formatted_context,
                     ),
-                },
+                ),
             ]
             
             # Stream response
@@ -185,7 +189,7 @@ class ResponseGenerator:
                 
         except Exception as e:
             logger.error(f"Error streaming response: {e}", exc_info=True)
-            yield f"Ошибка при потоковой генерации: {str(e)}"
+            yield f"ストリーミング生成でエラーが発生しました: {str(e)}"
     
     def create_summary_response(
         self,

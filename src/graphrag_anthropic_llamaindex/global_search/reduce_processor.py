@@ -102,9 +102,12 @@ class ReduceProcessor:
         
         # LLMを呼び出して最終回答を生成
         try:
+            # Use proper LlamaIndex ChatMessage format for Bedrock compatibility
+            from llama_index.core.llms import ChatMessage, MessageRole
+            
             messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
+                ChatMessage(role=MessageRole.USER, content=user_prompt)
             ]
             response = self.llm.chat(messages)
             final_response = str(response)

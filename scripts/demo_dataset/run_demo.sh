@@ -49,13 +49,26 @@ if [[ -z "$VIRTUAL_ENV" ]]; then
     fi
 fi
 
-# Clean up previous demo output
-if [ -d "$OUTPUT_DIR" ]; then
-    print_info "Cleaning up previous demo output..."
-    rm -rf "$OUTPUT_DIR"
+# Check if demo output already exists
+SKIP_INDEXING=false
+if [ -d "$OUTPUT_DIR" ] && [ -f "$OUTPUT_DIR/entities.parquet" ] && [ -f "$OUTPUT_DIR/relationships.parquet" ]; then
+    print_info "Existing demo output found. Checking if indexing can be skipped..."
+
+    # Check if the output contains valid data
+    ENTITY_COUNT=$(python -c "import pandas as pd; try: print(len(pd.read_parquet('$OUTPUT_DIR/entities.parquet'))); except: print(0)" 2>/dev/null || echo "0")
+    REL_COUNT=$(python -c "import pandas as pd; try: print(len(pd.read_parquet('$OUTPUT_DIR/relationships.parquet'))); except: print(0)" 2>/dev/null || echo "0")
+
+    if [ "$ENTITY_COUNT" -gt 0 ] && [ "$REL_COUNT" -gt 0 ]; then
+        print_info "Valid index found with $ENTITY_COUNT entities and $REL_COUNT relationships"
+        print_info "Skipping document ingestion and using existing index..."
+        SKIP_INDEXING=true
+    else
+        print_info "Invalid or empty index found. Will rebuild..."
+        rm -rf "$OUTPUT_DIR"
+    fi
 fi
 
-# Create output directory
+# Create output directory if needed
 mkdir -p "$OUTPUT_DIR"
 
 # Copy demo documents to data directory
@@ -102,14 +115,18 @@ elif [ "$LLM_PROVIDER" = "bedrock" ]; then
     print_info "Using AWS Bedrock provider - ANTHROPIC_API_KEY not required"
 fi
 
-# Run document ingestion
-print_step 2 "Ingesting documents and building knowledge graph..."
-echo ""
-cd "$PROJECT_ROOT"
-python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" add "$DATA_DIR" --output-dir "$OUTPUT_DIR"
+# Run document ingestion only if needed
+if [ "$SKIP_INDEXING" = false ]; then
+    print_step 2 "Ingesting documents and building knowledge graph..."
+    echo ""
+    cd "$PROJECT_ROOT"
+    python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" add "$DATA_DIR" --output-dir "$OUTPUT_DIR"
 
-# Wait for indexing to complete
-sleep 2
+    # Wait for indexing to complete
+    sleep 2
+else
+    print_step 2 "Using existing knowledge graph index..."
+fi
 
 # Display graph statistics
 print_step 3 "Knowledge graph statistics:"
