@@ -210,13 +210,13 @@ Please provide a detailed and accurate answer based on the provided context. Rem
         key_info = self.context_builder.extract_key_information(context)
         
         response_parts = [
-            f"Результаты DRIFT поиска для запроса: '{context.query}'",
+            f"DRIFT search results for query: '{context.query}'",
             "",
         ]
         
         # Add main entities
         if key_info["main_entities"]:
-            response_parts.append("**Основные сущности:**")
+            response_parts.append("**Main Entities:**")
             for entity in key_info["main_entities"]:
                 response_parts.append(
                     f"- {entity['name']} ({entity['type']}): {entity['description']}"
@@ -225,16 +225,16 @@ Please provide a detailed and accurate answer based on the provided context. Rem
         
         # Add main communities
         if key_info["main_communities"]:
-            response_parts.append("**Сообщества знаний:**")
+            response_parts.append("**Knowledge Communities:**")
             for community in key_info["main_communities"]:
                 response_parts.append(
-                    f"- {community['title']} ({community['size']} сущностей): {community['summary']}"
+                    f"- {community['title']} ({community['size']} entities): {community['summary']}"
                 )
             response_parts.append("")
         
         # Add summary points
         if key_info["summary_points"]:
-            response_parts.append("**Сводка:**")
+            response_parts.append("**Summary:**")
             for point in key_info["summary_points"]:
                 response_parts.append(f"- {point}")
         

@@ -205,10 +205,10 @@ class ContextBuilder:
                 entity_text = f"- {entity.name} ({entity.type}): {entity.description}"
                 if entity.relationships:
                     rel_count = len(entity.relationships)
-                    entity_text += f" [Имеет {rel_count} связей]"
+                    entity_text += f" [Has {rel_count} relationships]"
                 entity_texts.append(entity_text)
-            
-            sections.append("## Соответствующие сущности:\n" + "\n".join(entity_texts))
+
+            sections.append("## Relevant Entities:\n" + "\n".join(entity_texts))
         
         # Add communities section
         if context.communities:
@@ -217,10 +217,10 @@ class ContextBuilder:
                 community_text = f"- {community.title}: {community.summary}"
                 if community.entities:
                     entity_count = len(community.entities)
-                    community_text += f" [Содержит {entity_count} сущностей]"
+                    community_text += f" [Contains {entity_count} entities]"
                 community_texts.append(community_text)
-            
-            sections.append("## Сообщества знаний:\n" + "\n".join(community_texts))
+
+            sections.append("## Knowledge Communities:\n" + "\n".join(community_texts))
         
         # Add text units section
         if context.text_units:
@@ -228,7 +228,7 @@ class ContextBuilder:
             for unit in context.text_units[:5]:  # Limit to top 5
                 text_unit_texts.append(f"- {unit.text[:200]}...")
             
-            sections.append("## Текстовые фрагменты:\n" + "\n".join(text_unit_texts))
+            sections.append("## Text Fragments:\n" + "\n".join(text_unit_texts))
         
         return "\n\n".join(sections)
     
@@ -277,11 +277,11 @@ class ContextBuilder:
         # Generate summary points
         if context.entities:
             key_info["summary_points"].append(
-                f"Найдено {len(context.entities)} связанных сущностей"
+                f"Found {len(context.entities)} related entities"
             )
         if context.communities:
             key_info["summary_points"].append(
-                f"Идентифицировано {len(context.communities)} сообществ знаний"
+                f"Identified {len(context.communities)} knowledge communities"
             )
         
         return key_info

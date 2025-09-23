@@ -366,7 +366,7 @@ class TestResponseGenerator:
         assert "test query" in summary
         assert "Entity1" in summary
         assert "Community1" in summary
-        assert "2 сущностей" in summary  # Check entity count is included
+        assert "2 entities" in summary  # Check entity count is included
     
     def test_validate_response(self):
         """Test response validation."""
