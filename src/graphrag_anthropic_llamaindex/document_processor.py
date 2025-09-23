@@ -178,20 +178,29 @@ def add_documents(
             print(f"Saved {len(new_relationships_df)} new relationships to {output_dir}/relationships.parquet")
 
         # --- Community Detection ---
-        if extracted_relationships_list and community_detection_config:
+        if community_detection_config:
             print("Performing community detection...")
             graph = nx.Graph()
 
-            # Validate relationships before adding to graph
-            valid_relationships = []
-            for rel in extracted_relationships_list:
-                if validate_relationship(rel):
-                    valid_relationships.append(rel)
-                    graph.add_edge(rel['source'], rel['target'])
-                else:
-                    print(f"  Warning: Skipping invalid relationship for graph: {rel}")
+            # Load all relationships (existing + new) for community detection
+            all_relationships_df = load_relationships_db(output_dir)
+            if not all_relationships_df.empty:
+                # Convert DataFrame to list of dictionaries for validation
+                all_relationships_list = all_relationships_df.to_dict('records')
 
-            print(f"  Added {len(valid_relationships)} valid relationships to graph")
+                # Validate relationships before adding to graph
+                valid_relationships = []
+                for rel in all_relationships_list:
+                    if validate_relationship(rel):
+                        valid_relationships.append(rel)
+                        graph.add_edge(rel['source'], rel['target'])
+                    else:
+                        print(f"  Warning: Skipping invalid relationship for graph: {rel}")
+
+                print(f"  Added {len(valid_relationships)} valid relationships to graph")
+            else:
+                print("  No relationships found for community detection")
+                return
             
             max_cluster_size = community_detection_config.get("max_cluster_size", 10)
             use_lcc = community_detection_config.get("use_lcc", True)
