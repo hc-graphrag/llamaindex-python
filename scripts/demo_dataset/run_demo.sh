@@ -76,14 +76,18 @@ LLM_PROVIDER="anthropic"  # Default provider
 # Check demo config first, then fallback to main config
 if [ -f "$DEMO_CONFIG_FILE" ]; then
     CONFIG_FILE="$DEMO_CONFIG_FILE"
-    # Extract llm_provider from demo config (different format)
-    if grep -q "type.*bedrock" "$CONFIG_FILE"; then
-        LLM_PROVIDER="bedrock"
+    print_info "Using demo config: $DEMO_CONFIG_FILE"
+    # Extract llm_provider from demo config
+    if grep -q "llm_provider:" "$CONFIG_FILE"; then
+        LLM_PROVIDER=$(grep "llm_provider:" "$CONFIG_FILE" | awk '{print $2}' | tr -d '"' | tr -d "'")
+        print_info "Detected LLM provider: $LLM_PROVIDER"
     fi
 elif [ -f "$CONFIG_FILE" ]; then
+    print_info "Using main config: $CONFIG_FILE"
     # Extract llm_provider from main config (if specified)
     if grep -q "llm_provider:" "$CONFIG_FILE"; then
         LLM_PROVIDER=$(grep "llm_provider:" "$CONFIG_FILE" | awk '{print $2}' | tr -d '"' | tr -d "'")
+        print_info "Detected LLM provider: $LLM_PROVIDER"
     fi
 fi
 
