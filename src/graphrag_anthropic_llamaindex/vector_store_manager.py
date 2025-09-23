@@ -46,11 +46,32 @@ def get_vector_store(config, store_type="main"):
             output_dir = config.get("output_dir", ".")
             uri = os.path.join(output_dir, uri_from_config)
         
-        return LanceDBVectorStore(
-            uri=uri,
-            table_name=table_name,  # Use table name from constants
-            mode="overwrite", # Consider changing to "append" if you want to add to existing table
-        )
+        # Check if table already exists and use appropriate mode
+        table_path = os.path.join(uri, f"{table_name}.lance")
+
+        # Always use "create" mode to avoid schema issues
+        # LanceDB will handle existing tables appropriately
+        try:
+            return LanceDBVectorStore(
+                uri=uri,
+                table_name=table_name,  # Use table name from constants
+                mode="create",  # Always create to ensure schema consistency
+            )
+        except Exception as e:
+            # If creation fails due to existing table with different schema,
+            # try to remove the problematic table and recreate
+            if "schema" in str(e).lower() or "field" in str(e).lower():
+                print(f"Schema mismatch detected for table {table_name}. Recreating table...")
+                import shutil
+                if os.path.exists(table_path):
+                    shutil.rmtree(table_path)
+                return LanceDBVectorStore(
+                    uri=uri,
+                    table_name=table_name,
+                    mode="create",
+                )
+            else:
+                raise e
     return None # Falls back to default in-memory # Falls back to default in-memory # Falls back to default in-memory # Falls back to default in-memory # Falls back to default in-memory
 
 def get_index(storage_dir, vector_store=None, index_type="main"):
