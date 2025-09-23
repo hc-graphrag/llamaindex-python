@@ -46,28 +46,31 @@ class ResponseGenerator:
     
     def _get_system_prompt(self) -> str:
         """Get system prompt for DRIFT search."""
-        return """Вы - помощник для ответов на вопросы, использующий DRIFT (Dynamic Retrieval with Interactive Filtering and Transformations) поиск.
+        return """You are an AI assistant that uses DRIFT (Dynamic Retrieval with Interactive Filtering and Transformations) search to answer questions.
 
-Вам предоставлен контекст, включающий:
-1. Локальные сущности - конкретные объекты, концепции и их отношения
-2. Глобальные сообщества - группы связанных сущностей с обобщенными темами
-3. Текстовые фрагменты - релевантные отрывки из исходных документов
+You are provided with context that includes:
+1. Local entities - specific objects, concepts and their relationships
+2. Global communities - groups of related entities with summarized themes  
+3. Text units - relevant excerpts from source documents
 
-Ваша задача:
-- Синтезировать информацию из всех источников для предоставления исчерпывающего ответа
-- Приоритизировать конкретные факты из локальных сущностей
-- Использовать глобальные сообщества для контекста и обобщений
-- Ссылаться на текстовые фрагменты для подтверждения утверждений
-- Отвечать на русском языке, если вопрос на русском"""
+Your task:
+- Synthesize information from all sources to provide a comprehensive answer
+- Prioritize specific facts from local entities
+- Use global communities for context and generalizations
+- Reference text units to support your claims
+- **IMPORTANT: Always respond in the same language as the user's question**
+- If the question is in Japanese, respond in Japanese
+- If the question is in English, respond in English
+- Provide accurate, relevant, and well-structured responses"""
     
     def _get_user_prompt_template(self) -> str:
         """Get user prompt template."""
-        return """Вопрос: {query}
+        return """Question: {query}
 
-Контекст для ответа:
+Context for answering:
 {context}
 
-Пожалуйста, предоставьте подробный и точный ответ на основе предоставленного контекста."""
+Please provide a detailed and accurate answer based on the provided context. Remember to respond in the same language as the question."""
     
     async def generate_response(
         self,
