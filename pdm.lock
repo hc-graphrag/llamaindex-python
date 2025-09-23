@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:9db99dc7170ce7fbf6525ea112bb9f2809ecea3d294f568f43988fe03d7575be"
+content_hash = "sha256:e8fca94e635337eed79f350b7161af6108199e4e5af52ba5e089302b64932056"
 
 [[metadata.targets]]
 requires_python = ">=3.10,<3.12"
@@ -1652,13 +1652,48 @@ files = [
 ]
 
 [[package]]
+name = "lance-namespace"
+version = "0.0.6"
+requires_python = ">=3.9"
+summary = "Python client for Lance Namespace API"
+groups = ["default"]
+dependencies = [
+    "lance-namespace-urllib3-client",
+    "pyarrow>=14.0.0",
+    "pylance>=0.18.0",
+    "typing-extensions>=4.0.0",
+]
+files = [
+    {file = "lance_namespace-0.0.6-py3-none-any.whl", hash = "sha256:fd102aec0ca3672b15cae65f4b9bf15086f7a73cedb7f5c12c47b5b48f9090b4"},
+    {file = "lance_namespace-0.0.6.tar.gz", hash = "sha256:3eeeba5f6bb8d01504cda33d86e6c22bd9cefb1f6f3aac1f963d46a9ff09b9a0"},
+]
+
+[[package]]
+name = "lance-namespace-urllib3-client"
+version = "0.0.14"
+requires_python = ">=3.8"
+summary = "Lance Namespace Specification"
+groups = ["default"]
+dependencies = [
+    "pydantic>=2",
+    "python-dateutil>=2.8.2",
+    "typing-extensions>=4.7.1",
+    "urllib3<3.0.0,>=1.25.3",
+]
+files = [
+    {file = "lance_namespace_urllib3_client-0.0.14-py3-none-any.whl", hash = "sha256:40277cfcf7c9084419c2784e7924b3e316f6fe5b8057f4dc62a49f3b40c2d80c"},
+    {file = "lance_namespace_urllib3_client-0.0.14.tar.gz", hash = "sha256:911c6a3b5c2c98f4239b6d96609cf840e740c3af5482f5fb22096afb9db1dc1c"},
+]
+
+[[package]]
 name = "lancedb"
-version = "0.24.0"
+version = "0.25.0"
 requires_python = ">=3.9"
 summary = "lancedb"
 groups = ["default"]
 dependencies = [
     "deprecation",
+    "lance-namespace==0.0.6",
     "numpy",
     "overrides>=0.7",
     "packaging",
@@ -1667,13 +1702,13 @@ dependencies = [
     "tqdm>=4.27.0",
 ]
 files = [
-    {file = "lancedb-0.24.0-cp39-abi3-macosx_10_15_x86_64.whl", hash = "sha256:32954ff46ea51dd174bb6885181612246add07867b1e99fce934c586ea0668ee"},
-    {file = "lancedb-0.24.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:0355bb61a2a9fec7d2f644a96f994e4f53521d17e4d3d1fca4c6824f92d63d0e"},
-    {file = "lancedb-0.24.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:86014528ee986c308adaa94763000c03a3e23420d93516bf69c68d791855511c"},
-    {file = "lancedb-0.24.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:56c16bb960526262a0efe45e3ed98dd27bfde64a1cd0be7146751749eb6b922c"},
-    {file = "lancedb-0.24.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:bcad8e621d88ab5463c0a70c938789e6ffd9c719dc3f1ea5bafb2ed41f917a01"},
-    {file = "lancedb-0.24.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:0462d820a0404c1fd7b737fbc9e131438857d2fccd321852fba8ed5b55283e0a"},
-    {file = "lancedb-0.24.0-cp39-abi3-win_amd64.whl", hash = "sha256:5f1c22d86f0bd1e5dad3744ac28b02eafec89c83a0627903f840a1a7c77d785f"},
+    {file = "lancedb-0.25.0-cp39-abi3-macosx_10_15_x86_64.whl", hash = "sha256:ae2e80b7b3be3fa4d92fc8d500f47549dd1f8d28ca5092f1c898b92d0cfd4393"},
+    {file = "lancedb-0.25.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:a9d67ea9edffa596c6f190151fdd535da8e355a4fd1979c1dc19d540a5665916"},
+    {file = "lancedb-0.25.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d8fe20079ed86b1ab75c65dcfc920a9646c835e9c40ef825cadd148c11b0001e"},
+    {file = "lancedb-0.25.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b37bc402d85c83e454d9f2e79480b31acc5904bb159a4fc715032c7560494157"},
+    {file = "lancedb-0.25.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:f9bbc20bd1e64be359ca11c90428c00b0062d26b0291bddf32ab5471a3525c76"},
+    {file = "lancedb-0.25.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:1306be9c08e208a5bcb5188275f47f962c2eda96369fad5949a3ddaf592afc6d"},
+    {file = "lancedb-0.25.0-cp39-abi3-win_amd64.whl", hash = "sha256:f66283e5d63c99c2bfbd4eaa134d9a5c5b0145eb26a972648214f8ba87777e24"},
 ]
 
 [[package]]
@@ -1947,19 +1982,19 @@ files = [
 
 [[package]]
 name = "llama-index-vector-stores-lancedb"
-version = "0.4.0"
+version = "0.4.1"
 requires_python = "<4.0,>=3.9"
 summary = "llama-index vector_stores lancedb integration"
 groups = ["default"]
 dependencies = [
     "lancedb>=0.21.1",
-    "llama-index-core<0.14,>=0.13.0",
+    "llama-index-core<0.15,>=0.13.0",
     "pylance",
     "tantivy",
 ]
 files = [
-    {file = "llama_index_vector_stores_lancedb-0.4.0-py3-none-any.whl", hash = "sha256:78a2ecb5a6cb53b82bceb8238ac87b49359f2e915ad8a8c7d7683472b9d254f9"},
-    {file = "llama_index_vector_stores_lancedb-0.4.0.tar.gz", hash = "sha256:2df0bd397d6eb6c5bf114ba0d3e1cff119155ceff9700dcf680308aed68f3c8e"},
+    {file = "llama_index_vector_stores_lancedb-0.4.1-py3-none-any.whl", hash = "sha256:da7a6f732ec8a334b16c2255d918ced2e27935c5a89764a4bac3bf554d648f79"},
+    {file = "llama_index_vector_stores_lancedb-0.4.1.tar.gz", hash = "sha256:c6f324ce1dc0ce18ac92e744c0119c1865cd76fde22c3b960327c2dbe4726fcd"},
 ]
 
 [[package]]

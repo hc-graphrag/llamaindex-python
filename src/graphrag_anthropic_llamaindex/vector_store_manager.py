@@ -5,6 +5,7 @@ from llama_index.core import (
     load_index_from_storage,
 )
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
+from .lance_fix import FixedLanceDBVectorStore
 
 # Constants for vector store table names
 VECTOR_STORE_TABLE_NAMES = {
@@ -52,7 +53,7 @@ def get_vector_store(config, store_type="main"):
         # Always use "create" mode to avoid schema issues
         # LanceDB will handle existing tables appropriately
         try:
-            return LanceDBVectorStore(
+            return FixedLanceDBVectorStore(
                 uri=uri,
                 table_name=table_name,  # Use table name from constants
                 mode="create",  # Always create to ensure schema consistency
@@ -65,7 +66,7 @@ def get_vector_store(config, store_type="main"):
                 import shutil
                 if os.path.exists(table_path):
                     shutil.rmtree(table_path)
-                return LanceDBVectorStore(
+                return FixedLanceDBVectorStore(
                     uri=uri,
                     table_name=table_name,
                     mode="create",

@@ -78,23 +78,34 @@ class LocalSearcher:
             # Load entity data if not cached
             if self._entities_cache is None:
                 # Use default output_dir from config or fallback
-                output_dir = "graphrag_output"
+                output_dir = "demo_output"  # Fixed to match demo directory
                 self._entities_cache = load_entities_db(output_dir)
-            
+
             # Convert results to Entity objects
             entities = []
             for node in result.nodes:
-                entity_id = node.node.node_id
-                
-                # Find entity in cache
+                entity_id = node.node_id
+
+                # Find entity in cache by name (entities don't have id column)
+                # Extract entity name from node metadata or text
+                entity_name = None
+                if hasattr(node, 'metadata') and node.metadata:
+                    entity_name = node.metadata.get('name')
+
+                if not entity_name and hasattr(node, 'text') and node.text:
+                    entity_name = node.text.strip()
+
+                if not entity_name:
+                    entity_name = entity_id  # Fallback to using entity_id as name
+
                 entity_data = self._entities_cache[
-                    self._entities_cache["id"] == entity_id
+                    self._entities_cache["name"] == entity_name
                 ].to_dict("records")
                 
                 if entity_data:
                     entity_dict = entity_data[0]
                     entity = Entity(
-                        id=entity_dict.get("id", ""),
+                        id=entity_name,  # Use name as ID since no separate ID column
                         name=entity_dict.get("name", ""),
                         type=entity_dict.get("type", ""),
                         description=entity_dict.get("description", ""),
@@ -131,7 +142,7 @@ class LocalSearcher:
         # Load relationships if not cached
         if self._relationships_cache is None:
             # Use default output_dir from config or fallback
-            output_dir = "graphrag_output"
+            output_dir = "demo_output"
             self._relationships_cache = load_relationships_db(output_dir)
         
         # Track visited entities to avoid cycles
@@ -161,7 +172,7 @@ class LocalSearcher:
                         # Load entities if not cached
                         if self._entities_cache is None:
                             # Use default output_dir from config or fallback
-                            output_dir = "graphrag_output"
+                            output_dir = "demo_output"
                             self._entities_cache = load_entities_db(output_dir)
                         
                         # Find entity data

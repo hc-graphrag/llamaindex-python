@@ -156,7 +156,10 @@ def main():
             else:
                 mode = "global"
         else:
-            mode = args.mode
+            # Check config for search mode, then use command line arg as fallback
+            config_mode = config.get("search", {}).get("mode", args.mode)
+            mode = config_mode if config_mode else args.mode
+            print(f"Using search mode: {mode} (from {'config' if config_mode != args.mode else 'command line'})")
         
         # Use the new SearchModeRouter for unified search interface
         try:

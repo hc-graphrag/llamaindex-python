@@ -75,18 +75,30 @@ class GlobalSearcher:
             # Load community data if not cached
             if self._communities_cache is None:
                 # Use default output_dir from config or fallback
-                output_dir = "graphrag_output"
+                output_dir = "demo_output"  # Fixed to match demo directory
                 self._communities_cache = load_community_summaries_db(output_dir)
-            
+
             # Convert results to Community objects
             communities = []
             for node in result.nodes:
                 # Extract community ID from node
-                community_id = node.node.node_id
-                
-                # Find community in cache
+                community_id = node.node_id
+
+                # Find community in cache by community_id
+                # Extract community ID from node metadata
+                actual_community_id = None
+                if hasattr(node, 'metadata') and node.metadata:
+                    actual_community_id = node.metadata.get('community_id')
+
+                if actual_community_id is None:
+                    # Try to extract from node_id or use as fallback
+                    try:
+                        actual_community_id = int(community_id)
+                    except (ValueError, TypeError):
+                        actual_community_id = 0  # Default fallback
+
                 community_data = self._communities_cache[
-                    self._communities_cache["id"] == community_id
+                    self._communities_cache["community_id"] == actual_community_id
                 ].to_dict("records")
                 
                 if community_data:
@@ -98,10 +110,10 @@ class GlobalSearcher:
                         summary = summary[:self.max_summary_length] + "..."
                     
                     community = Community(
-                        id=community_dict.get("id", ""),
-                        title=community_dict.get("title", ""),
+                        id=str(community_dict.get("community_id", actual_community_id)),
+                        title=community_dict.get("title", f"Community {actual_community_id}"),
                         summary=summary if self.include_summaries else "",
-                        entities=community_dict.get("entities", []),
+                        entities=community_dict.get("key_entities", []),  # Use key_entities instead of entities
                         level=community_dict.get("level", 0),
                     )
                     communities.append(community)

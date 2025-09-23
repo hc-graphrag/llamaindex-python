@@ -26,14 +26,14 @@ vector_store:
 community_vector_store:
   type: "lancedb"
   lancedb:
-    uri: "./demo_output/lancedb_communities"
+    uri: "./demo_output/lancedb_main"
     table_name: "community_vectors"
 
 entity_vector_store:
   type: "lancedb"
   lancedb:
-    uri: "./demo_output/lancedb_entities"
-    table_name: "entity_vectors"
+    uri: "./demo_output/lancedb_main"
+    table_name: "entities_vectors"
 
 community_detection:
   algorithm: "leiden"
@@ -46,3 +46,10 @@ ignore_patterns:
   - ".git/*"
   - "__pycache__/*"
   - "*.log"
+
+# Enable DRIFT search (combines local entity search + global community search)
+search:
+  mode: "drift"  # Set to drift to enable DRIFT search
+  drift:
+    local_top_k: 10
+    global_top_k: 5

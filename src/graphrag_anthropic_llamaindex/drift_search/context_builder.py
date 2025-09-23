@@ -215,7 +215,7 @@ class ContextBuilder:
             community_texts = []
             for community in context.communities[:5]:  # Limit to top 5
                 community_text = f"- {community.title}: {community.summary}"
-                if community.entities:
+                if community.entities is not None and len(community.entities) > 0:
                     entity_count = len(community.entities)
                     community_text += f" [Contains {entity_count} entities]"
                 community_texts.append(community_text)
