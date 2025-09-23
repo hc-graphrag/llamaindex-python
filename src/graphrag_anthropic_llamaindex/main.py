@@ -27,6 +27,8 @@ def main():
 
     # 'add' command
     add_parser = subparsers.add_parser("add", help="Add documents to the index.")
+    add_parser.add_argument("input_dir", nargs="?", help="Input directory containing documents (optional, uses config if not specified)")
+    add_parser.add_argument("--output-dir", help="Output directory for processed data (optional, uses config if not specified)")
 
     # 'search' command
     search_parser = subparsers.add_parser("search", help="Search the index.")
@@ -39,6 +41,7 @@ def main():
                                help="Output format: 'markdown' or 'json'.")
     search_parser.add_argument("--min-community-rank", type=int, default=0,
                                help="Minimum community rank to include (0 = all levels).")
+    search_parser.add_argument("--output-dir", help="Output directory for search index (optional, uses config if not specified)")
     # Keep backward compatibility
     search_parser.add_argument("--target-index", type=str, choices=["main", "entity", "community", "both"], 
                                help="(Deprecated) Use --mode instead. Specify which index to search.")
@@ -76,8 +79,12 @@ def main():
         model_name = anthropic_config.get("model", "claude-3-opus-20240229")
         api_base_url = anthropic_config.get("api_base_url")
 
-    input_dir = config.get("input_dir", "./data")
-    output_dir = config.get("output_dir", "./graphrag_output")
+    # Override input/output directories from command line if provided
+    input_dir = args.input_dir if hasattr(args, 'input_dir') and args.input_dir else config.get("input_dir", "./data")
+    if hasattr(args, 'output_dir') and args.output_dir:
+        output_dir = args.output_dir
+    else:
+        output_dir = config.get("output_dir", "./graphrag_output")
 
     main_vector_store = get_vector_store(config, store_type="main")
     entity_vector_store = get_vector_store(config, store_type="entity")

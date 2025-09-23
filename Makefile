@@ -141,6 +141,49 @@ info: ## システム情報を表示
 	@echo "🌐 アプリURL: http://localhost:7860"
 	@echo "================================================"
 
+# AWS認証
+aws-login: ## .envファイルを使用してAWSにログイン
+	@echo "🔐 AWSにログイン中..."
+	@if [ -f .env ]; then \
+		set -a && . $(PWD)/.env && set +a; \
+		if [ -n "$$AWS_PROFILE_NAME" ]; then \
+			echo "📋 AWS Profile: $$AWS_PROFILE_NAME を使用"; \
+			aws configure list --profile $$AWS_PROFILE_NAME; \
+			if ! aws sts get-caller-identity --profile $$AWS_PROFILE_NAME >/dev/null 2>&1; then \
+				echo "⚠️  トークンが期限切れです。SSOに再ログインします..."; \
+				aws sso login --profile $$AWS_PROFILE_NAME; \
+				aws sts get-caller-identity --profile $$AWS_PROFILE_NAME; \
+			else \
+				aws sts get-caller-identity --profile $$AWS_PROFILE_NAME; \
+			fi; \
+		elif [ -n "$$AWS_ACCESS_KEY_ID" ] && [ -n "$$AWS_SECRET_ACCESS_KEY" ]; then \
+			echo "🔑 AWS Access Key を使用"; \
+			aws sts get-caller-identity; \
+		else \
+			echo "❌ AWS認証情報が設定されていません"; \
+			echo "    .envファイルで以下のいずれかを設定してください:"; \
+			echo "    - AWS_PROFILE_NAME (推奨)"; \
+			echo "    - AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "⚠️  .envファイルが見つかりません"; \
+		echo "    cp .env.example .env"; \
+		exit 1; \
+	fi
+
+# デモ実行
+demo: ## DRIFT検索デモを実行（.envファイルを使用）
+	@echo "🚀 DRIFT検索デモを開始中..."
+	@if [ -f .env ]; then \
+		set -a && . $(PWD)/.env && set +a && ./scripts/demo_dataset/run_demo.sh; \
+	else \
+		echo "⚠️  .envファイルが見つかりません。.env.exampleを参考に作成してください。"; \
+		echo "    cp .env.example .env"; \
+		echo "    # .envファイルを編集してAPIキーを設定"; \
+		exit 1; \
+	fi
+
 # 便利なエイリアス
 start: up ## コンテナを起動（upのエイリアス）
 stop: down ## コンテナを停止（downのエイリアス）

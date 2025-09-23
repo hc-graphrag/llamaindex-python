@@ -68,18 +68,41 @@ echo "  ✓ Copied $(ls -1 "$DEMO_DATA_DIR" | wc -l) documents to data directory
 # Set environment variables
 export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
 
-# Check API key
-if [ -z "$ANTHROPIC_API_KEY" ]; then
-    print_error "ANTHROPIC_API_KEY is not set. Please set it before running the demo."
-    echo "    export ANTHROPIC_API_KEY='your-api-key'"
+# Use demo-specific config file
+DEMO_CONFIG_FILE="$SCRIPT_DIR/config.yaml"
+CONFIG_FILE="$PROJECT_ROOT/config/config.yaml"
+LLM_PROVIDER="anthropic"  # Default provider
+
+# Check demo config first, then fallback to main config
+if [ -f "$DEMO_CONFIG_FILE" ]; then
+    CONFIG_FILE="$DEMO_CONFIG_FILE"
+    # Extract llm_provider from demo config (different format)
+    if grep -q "type.*bedrock" "$CONFIG_FILE"; then
+        LLM_PROVIDER="bedrock"
+    fi
+elif [ -f "$CONFIG_FILE" ]; then
+    # Extract llm_provider from main config (if specified)
+    if grep -q "llm_provider:" "$CONFIG_FILE"; then
+        LLM_PROVIDER=$(grep "llm_provider:" "$CONFIG_FILE" | awk '{print $2}' | tr -d '"' | tr -d "'")
+    fi
+fi
+
+# Check API key only if using Anthropic provider directly
+if [ "$LLM_PROVIDER" = "anthropic" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
+    print_error "ANTHROPIC_API_KEY is required when using Anthropic provider."
+    echo "    Option 1: Set API key: export ANTHROPIC_API_KEY='your-api-key'"
+    echo "    Option 2: Use AWS Bedrock by setting 'llm_provider: bedrock' in config/config.yaml"
+    echo "             (Bedrock does NOT require ANTHROPIC_API_KEY)"
     exit 1
+elif [ "$LLM_PROVIDER" = "bedrock" ]; then
+    print_info "Using AWS Bedrock provider - ANTHROPIC_API_KEY not required"
 fi
 
 # Run document ingestion
 print_step 2 "Ingesting documents and building knowledge graph..."
 echo ""
 cd "$PROJECT_ROOT"
-python -m graphrag_anthropic_llamaindex.main add "$DATA_DIR" --output-dir "$OUTPUT_DIR"
+python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" add "$DATA_DIR" --output-dir "$OUTPUT_DIR"
 
 # Wait for indexing to complete
 sleep 2
@@ -125,7 +148,7 @@ run_search() {
     echo "Query: \"$query\""
     echo "---"
     
-    python -m graphrag_anthropic_llamaindex.main search "$query" \
+    python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" search "$query" \
         --mode "$mode" \
         --output-dir "$OUTPUT_DIR" 2>/dev/null | head -20
     
@@ -152,7 +175,7 @@ echo ""
 
 for mode in "${modes[@]}"; do
     echo -e "${BLUE}━━━ ${mode^^} Search ━━━${NC}"
-    python -m graphrag_anthropic_llamaindex.main search "$SAMPLE_QUERY" \
+    python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" search "$SAMPLE_QUERY" \
         --mode "$mode" \
         --output-dir "$OUTPUT_DIR" 2>/dev/null | head -15
     echo ""
@@ -174,7 +197,7 @@ while true; do
     
     if [ -n "$user_query" ]; then
         echo ""
-        python -m graphrag_anthropic_llamaindex.main search "$user_query" \
+        python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" search "$user_query" \
             --mode "drift" \
             --output-dir "$OUTPUT_DIR"
         echo ""
@@ -186,7 +209,7 @@ print_step 7 "Demo completed!"
 echo ""
 print_info "Output files are saved in: $OUTPUT_DIR"
 print_info "To run searches manually, use:"
-echo "    python -m graphrag_anthropic_llamaindex.main search \"your query\" --mode drift --output-dir $OUTPUT_DIR"
+echo "    python -m graphrag_anthropic_llamaindex.main --config $CONFIG_FILE search \"your query\" --mode drift --output-dir $OUTPUT_DIR"
 echo ""
 
 echo -e "${GREEN}✓ Demo completed successfully!${NC}"
