@@ -2,12 +2,13 @@
 SearchModeRouter - 検索モードのルーティングを管理
 """
 
+import asyncio
 import logging
 from typing import Dict, Any, Optional, List
 from enum import Enum
 
 from llama_index.core.base.base_retriever import BaseRetriever
-from llama_index.core.schema import NodeWithScore, QueryBundle
+from llama_index.core.schema import NodeWithScore, QueryBundle, TextNode
 
 from .retriever import GlobalSearchRetriever
 # Local検索は後で実装（search_processorの統合）
@@ -167,32 +168,50 @@ class SearchModeRouter(BaseRetriever):
     def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
         """
         同期的に検索を実行
-        
+
         Args:
             query_bundle: クエリバンドル
-        
+
         Returns:
             検索結果のNodeWithScoreリスト
         """
         query = query_bundle.query_str
+        print(f"\n=== SearchModeRouter Debug ===")
+        print(f"Query: '{query}'")
+        print(f"Current mode: {self.mode.value}")
+        print(f"Available retrievers:")
+        print(f"  - Local: {self.local_retriever is not None}")
+        print(f"  - Global: {self.global_retriever is not None}")
+        print(f"  - DRIFT: {self.drift_retriever is not None}")
+
         selected_mode = self.route(query)
-        
+        print(f"Selected mode: {selected_mode.value}")
+
         logger.info(f"検索モード: {selected_mode.value}")
-        
+
         if selected_mode == SearchMode.LOCAL:
             if self.local_retriever is None:
+                print("❌ Local検索が初期化されていません")
                 logger.error("Local検索が初期化されていません")
                 return []
-            return self._execute_local_search(query_bundle)
-        
+            print("✓ Executing local search...")
+            results = self._execute_local_search(query_bundle)
+            print(f"✓ Local search completed, results: {len(results)} nodes")
+            return results
+
         elif selected_mode == SearchMode.GLOBAL:
             if self.global_retriever is None:
+                print("❌ Global検索が初期化されていません")
                 logger.error("Global検索が初期化されていません")
                 return []
-            return self.global_retriever._retrieve(query_bundle)
-        
+            print("✓ Executing global search...")
+            results = self.global_retriever._retrieve(query_bundle)
+            print(f"✓ Global search completed, results: {len(results)} nodes")
+            return results
+
         elif selected_mode == SearchMode.DRIFT:
             if self.drift_retriever is None:
+                print("⚠️  DRIFT検索はまだ実装されていません。Global検索にフォールバック")
                 logger.warning("DRIFT検索はまだ実装されていません。Global検索にフォールバック")
                 if self.global_retriever is not None:
                     return self.global_retriever._retrieve(query_bundle)
@@ -283,10 +302,17 @@ class SearchModeRouter(BaseRetriever):
             
             def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
                 """同期的にDRIFT検索を実行"""
+                print(f"\n=== DRIFT Retriever Debug ===")
+                print(f"Query: '{query_bundle.query_str}'")
+                print(f"DRIFT Engine: {type(self.drift_engine).__name__}")
+
                 try:
+                    print("✓ Starting async event loop...")
                     # 非同期関数を同期的に実行
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
+
+                    print("✓ Executing DRIFT search...")
                     result = loop.run_until_complete(
                         self.drift_engine.search(
                             query_bundle.query_str,
@@ -295,12 +321,24 @@ class SearchModeRouter(BaseRetriever):
                         )
                     )
                     loop.close()
-                    
+                    print(f"✓ DRIFT search completed")
+                    print(f"Result type: {type(result)}")
+                    print(f"Result length: {len(str(result))}")
+
+                    # Check if result is empty or just whitespace
+                    if not result or (isinstance(result, str) and not result.strip()):
+                        print("⚠️  WARNING: DRIFT search returned empty result!")
+
                     # 結果をNodeWithScoreに変換
-                    node = TextNode(text=result, id_="drift_result")
-                    return [NodeWithScore(node=node, score=1.0)]
+                    node = TextNode(text=str(result), id_="drift_result")
+                    result_nodes = [NodeWithScore(node=node, score=1.0)]
+                    print(f"✓ Converted to {len(result_nodes)} NodeWithScore objects")
+                    return result_nodes
+
                 except Exception as e:
-                    logger.error(f"DRIFT検索エラー: {e}")
+                    print(f"❌ DRIFT検索エラー: {e}")
+                    print(f"Error type: {type(e).__name__}")
+                    logger.error(f"DRIFT検索エラー: {e}", exc_info=True)
                     return []
             
             async def _aretrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
