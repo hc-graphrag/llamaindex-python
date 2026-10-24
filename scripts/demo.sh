@@ -32,22 +32,22 @@ echo -e "\n3. 検索機能のデモンストレーション:"
 # 3.1. メインテキストインデックスの検索
 echo -e "\n--- 3.1. メインテキストインデックスの検索 ---"
 echo "クエリ: \"AIの最新動向について教えてください\""
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "AIの最新動向について教えてください" --target-index main
+poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "AIの最新動向について教えてください" --mode local
 
 # 3.2. エンティティインデックスの検索
 echo -e "\n--- 3.2. エンティティインデックスの検索 ---"
 echo "クエリ: \"Acme CorpのCEOは誰ですか？\""
-poetry run python src/graphrag-anthropic-llamaindex/main.py --config config.yaml search "Acme CorpのCEOは誰ですか？" --target-index entity
+poetry run python src/graphrag-anthropic-llamaindex/main.py --config config.yaml search "Acme CorpのCEOは誰ですか？" --mode local
 
 # 3.3. コミュニティ要約インデックスの検索
 echo -e "\n--- 3.3. コミュニティ要約インデックスの検索 ---"
 echo "クエリ: \"サステナブルテクノロジーに関するコミュニティはありますか？\""
-poetry run python src/graphrag-anthropic_llamaindex/main.py --config config.yaml search "サステナブルテクノロジーに関するコミュニティはありますか？" --target-index community
+poetry run python src/graphrag-anthropic_llamaindex/main.py --config config.yaml search "サステナブルテクノロジーに関するコミュニティはありますか？" --mode global
 
 # 3.4. 全てのインデックスを検索 (デフォルト)
 echo -e "\n--- 3.4. 全てのインデックスを検索 (デフォルト) ---"
 echo "クエリ: \"気候変動に関する主要な研究機関は？\""
-poetry run python src/graphrag-anthropic-llamaindex/main.py --config config.yaml search "気候変動に関する主要な研究機関は？" --target-index both
+poetry run python src/graphrag-anthropic-llamaindex/main.py --config config.yaml search "気候変動に関する主要な研究機関は？" --mode auto
 
 echo -e "\n==================================================="
 echo "デモスクリプト完了。"

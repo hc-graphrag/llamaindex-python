@@ -56,7 +56,6 @@ graphrag-anthropic-llamaindex/
         ├── graph_operations.py # グラフ操作とコミュニティ検出
         ├── llm_utils.py      # LLMからのJSON出力パースとプロンプトテンプレート
         ├── document_processor.py # ドキュメントの追加処理
-        └── search_processor.py # 検索処理
 ```
 
 ## インストール
@@ -129,33 +128,33 @@ poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/conf
 
 ```bash
 bash
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "あなたのクエリ" --target-index <インデックスタイプ>
+poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "あなたのクエリ" --mode <local|global|drift|auto>
 ```
 
-`<インデックスタイプ>` には以下のいずれかを指定します。
+`--mode` には以下のいずれかを指定します(`config` の `search.mode` が指定されている場合はそちらが優先されます)。
 
-*   `main`: メインテキストチャンクのインデックスを検索します。
-*   `entity`: 抽出されたエンティティのインデックスを検索します。
-*   `community`: コミュニティ要約のインデックスを検索します。
-*   `both` (デフォルト): `main`, `entity`, `community` のすべてのインデックスを検索します。
+*   `local`: エンティティ中心の詳細な検索。
+*   `global`: コミュニティ要約の map-reduce による包括的な検索(デフォルト)。
+*   `drift`: DRIFT 検索(global プライマー → 追従 local 検索)。
+*   `auto`: クエリから自動でモードを選択。
 
 **例:**
 
-*   **メインテキストインデックスの検索:**
+*   **デフォルト(global)での検索:**
     ```bash
     poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "AIの最新動向について教えてください"
     ```
-*   **エンティティインデックスの検索:**
+*   **local モードでの検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "Acme CorpのCEOは誰ですか？" --target-index entity
+    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "Acme CorpのCEOは誰ですか？" --mode local
     ```
-*   **コミュニティ要約インデックスの検索:**
+*   **global モードでの検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "サステナブルテクノロジーに関するコミュニティはありますか？" --target-index community
+    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "サステナブルテクノロジーに関するコミュニティはありますか？" --mode global
     ```
-*   **すべてのインデックスを検索:**
+*   **モード自動選択(--mode auto)での検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "気候変動に関する主要な研究機関は？"
+    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "気候変動に関する主要な研究機関は？" --mode auto
     ```
 
 ## デモスクリプトの実行

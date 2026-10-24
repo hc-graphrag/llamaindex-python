@@ -535,22 +535,18 @@ class TestReduceProcessor:
     
     @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
     def test_reduce_with_llm_error(self, mock_configured_llm, mock_llm_config, mock_llm, sample_map_results):
-        """LLMエラー時のフォールバックをテスト"""
+        """LLMエラーは握りつぶさず呼び出し元へ伝播する"""
         mock_configured_llm.return_value = None
         processor = ReduceProcessor(llm_config=mock_llm_config)
         processor.llm = mock_llm
         mock_llm.chat.side_effect = Exception("LLM error")
         
-        result = processor.reduce(
-            map_results=sample_map_results,
-            query="test query",
-            processing_time=1.5
-        )
-        
-        # フォールバック応答が生成されるか確認
-        assert isinstance(result, GlobalSearchResult)
-        assert "test query" in result.response
-        assert "自動生成されたもの" in result.response
+        with pytest.raises(Exception, match="LLM error"):
+            processor.reduce(
+                map_results=sample_map_results,
+                query="test query",
+                processing_time=1.5
+            )
     
     @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
     def test_build_reduce_context(self, mock_configured_llm, mock_llm_config):
@@ -605,25 +601,6 @@ class TestReduceProcessor:
         assert "chunk1" in traceability.chunk_ids
         assert "e1" in traceability.entity_ids
         assert "e2" in traceability.entity_ids
-    
-    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
-    def test_create_fallback_response(self, mock_configured_llm, mock_llm_config):
-        """フォールバック応答作成をテスト"""
-        mock_configured_llm.return_value = None
-        processor = ReduceProcessor(llm_config=mock_llm_config)
-        
-        key_points = [
-            KeyPoint(f"Point {i}", 100 - i * 10, [f"r{i}"])
-            for i in range(15)
-        ]
-        
-        response = processor._create_fallback_response(key_points, "test query")
-        
-        assert "test query" in response
-        assert "1. Point 0" in response
-        assert "10. Point 9" in response
-        assert "11. Point 10" not in response  # 最大10個まで
-        assert "自動生成されたもの" in response
     
     @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
     def test_format_output(self, mock_configured_llm, mock_llm_config, sample_map_results):

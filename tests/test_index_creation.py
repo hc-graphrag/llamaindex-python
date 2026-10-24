@@ -27,7 +27,6 @@ os.environ["ANTHROPIC_API_KEY"] = "test-key"
 try:
     from graphrag_anthropic_llamaindex.document_processor import add_documents
     from graphrag_anthropic_llamaindex.vector_store_manager import get_vector_store, get_index
-    from graphrag_anthropic_llamaindex.search_processor import search_index
     from graphrag_anthropic_llamaindex.config_manager import load_config
     from graphrag_anthropic_llamaindex.file_filter import FileFilter
     from llama_index.core import Settings

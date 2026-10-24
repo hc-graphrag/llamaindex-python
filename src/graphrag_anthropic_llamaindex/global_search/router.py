@@ -11,7 +11,6 @@ from llama_index.core.base.base_retriever import BaseRetriever
 from llama_index.core.schema import NodeWithScore, QueryBundle, TextNode
 
 from .retriever import GlobalSearchRetriever
-# Local検索は後で実装（search_processorの統合）
 
 logger = logging.getLogger(__name__)
 
@@ -211,11 +210,7 @@ class SearchModeRouter(BaseRetriever):
 
         elif selected_mode == SearchMode.DRIFT:
             if self.drift_retriever is None:
-                print("⚠️  DRIFT検索はまだ実装されていません。Global検索にフォールバック")
-                logger.warning("DRIFT検索はまだ実装されていません。Global検索にフォールバック")
-                if self.global_retriever is not None:
-                    return self.global_retriever._retrieve(query_bundle)
-                return []
+                raise RuntimeError("DRIFT検索が初期化されていません")
             return self.drift_retriever._retrieve(query_bundle)
         
         else:
@@ -253,10 +248,7 @@ class SearchModeRouter(BaseRetriever):
         
         elif selected_mode == SearchMode.DRIFT:
             if self.drift_retriever is None:
-                logger.warning("DRIFT検索はまだ実装されていません。Global検索にフォールバック")
-                if self.global_retriever is not None:
-                    return await self.global_retriever._aretrieve(query_bundle)
-                return []
+                raise RuntimeError("DRIFT検索が初期化されていません")
             return await self.drift_retriever._aretrieve(query_bundle)
         
         else:

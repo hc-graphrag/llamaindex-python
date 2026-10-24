@@ -13,7 +13,6 @@ from graphrag_anthropic_llamaindex.claude_code_llm import ClaudeCodeLLM
 from graphrag_anthropic_llamaindex.config_manager import load_config
 from graphrag_anthropic_llamaindex.vector_store_manager import get_vector_store
 from graphrag_anthropic_llamaindex.document_processor import add_documents
-from graphrag_anthropic_llamaindex.search_processor import search_index
 from graphrag_anthropic_llamaindex.file_filter import FileFilter
 from graphrag_anthropic_llamaindex.global_search import SearchModeRouter, GlobalSearchRetriever
 
@@ -43,9 +42,6 @@ def main():
     search_parser.add_argument("--min-community-rank", type=int, default=0,
                                help="Minimum community rank to include (0 = all levels).")
     search_parser.add_argument("--output-dir", help="Output directory for search index (optional, uses config if not specified)")
-    # Keep backward compatibility
-    search_parser.add_argument("--target-index", type=str, choices=["main", "entity", "community", "both"], 
-                               help="(Deprecated) Use --mode instead. Specify which index to search.")
 
     args = parser.parse_args()
 
@@ -152,62 +148,44 @@ def main():
                       community_vector_store, community_detection_config,
                       use_archive_reader=True, file_filter=file_filter)
     elif args.command == "search":
-        # Handle backward compatibility with --target-index
-        if args.target_index:
-            print("Warning: --target-index is deprecated. Please use --mode instead.")
-            # Map old target-index to new mode
-            if args.target_index in ["main", "entity", "both"]:
-                mode = "local"
-            elif args.target_index == "community":
-                mode = "global"
-            else:
-                mode = "global"
-        else:
-            # Check config for search mode, then use command line arg as fallback
-            config_mode = config.get("search", {}).get("mode", args.mode)
-            mode = config_mode if config_mode else args.mode
-            print(f"Using search mode: {mode} (from {'config' if config_mode != args.mode else 'command line'})")
-        
+        # config の search.mode が CLI の --mode より優先される
+        config_mode = config.get("search", {}).get("mode", args.mode)
+        mode = config_mode if config_mode else args.mode
+        print(f"Using search mode: {mode} (from {'config' if config_mode != args.mode else 'command line'})")
+
         # Use the new SearchModeRouter for unified search interface
-        try:
-            router = SearchModeRouter(
-                config=config,
-                mode=mode,
-                vector_store_main=main_vector_store,
-                vector_store_entity=entity_vector_store,
-                vector_store_community=community_vector_store,
-                response_type=args.response_type,
-                min_community_rank=args.min_community_rank,
-                output_format=args.output_format
-            )
-            
-            # Execute search
-            from llama_index.core.schema import QueryBundle
-            query_bundle = QueryBundle(query_str=args.query)
-            results = router._retrieve(query_bundle)
-            
-            # Display results
-            if results:
-                for i, node_with_score in enumerate(results):
-                    if i == 0:  # Main result
-                        if args.output_format == "json":
-                            import json
-                            print(json.dumps(node_with_score.node.metadata, ensure_ascii=False, indent=2))
-                        else:
-                            print(node_with_score.node.text)
+        router = SearchModeRouter(
+            config=config,
+            mode=mode,
+            vector_store_main=main_vector_store,
+            vector_store_entity=entity_vector_store,
+            vector_store_community=community_vector_store,
+            response_type=args.response_type,
+            min_community_rank=args.min_community_rank,
+            output_format=args.output_format
+        )
+        
+        # Execute search
+        from llama_index.core.schema import QueryBundle
+        query_bundle = QueryBundle(query_str=args.query)
+        results = router._retrieve(query_bundle)
+        
+        # Display results
+        if results:
+            for i, node_with_score in enumerate(results):
+                if i == 0:  # Main result
+                    if args.output_format == "json":
+                        import json
+                        print(json.dumps(node_with_score.node.metadata, ensure_ascii=False, indent=2))
                     else:
-                        # Additional nodes (key points, etc.) if included
-                        if args.output_format == "json":
-                            print(f"\n--- Key Point {i} (Score: {node_with_score.score:.2f}) ---")
-                            print(node_with_score.node.text)
-            else:
-                print("No results found.")
-                
-        except Exception as e:
-            print(f"Error during search: {e}")
-            # Fallback to old search method
-            search_index(args.query, output_dir, llm_params, main_vector_store,
-                        entity_vector_store, community_vector_store, args.target_index or "both")
+                        print(node_with_score.node.text)
+                else:
+                    # Additional nodes (key points, etc.) if included
+                    if args.output_format == "json":
+                        print(f"\n--- Key Point {i} (Score: {node_with_score.score:.2f}) ---")
+                        print(node_with_score.node.text)
+        else:
+            print("No results found.")
 
 if __name__ == "__main__":
     main()

@@ -15,7 +15,7 @@
   - `pip install -e .`
 - Run CLI:
   - `python -m graphrag_anthropic_llamaindex.main add --config config.yaml`
-  - `python -m graphrag_anthropic_llamaindex.main search "python graphs" --target-index both`
+  - `python -m graphrag_anthropic_llamaindex.main search "python graphs" --mode auto`
 - Gradio app: `python gradio_app.py` (served on `http://localhost:7860`).
 - Docker (preferred for UI/dev): `make up`, `make logs`, `make down`, `make shell`.
 - Tests: `pytest -q` (runs under `tests/`).
@@ -24,7 +24,7 @@
 - Python ≥3.11. Use PEP 8, 4-space indentation, type hints where practical.
 - Names: modules/functions/vars `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE_CASE`.
 - Keep functions short and single-responsibility; add docstrings for public APIs.
-- Follow existing patterns in `vector_store_manager.py`, `document_processor.py`, and `search_processor.py`.
+- Follow existing patterns in `vector_store_manager.py`, `document_processor.py`.
 
 ## Testing Guidelines
 - Framework: pytest. Place new tests in `tests/` named `test_*.py` and functions `test_*`.

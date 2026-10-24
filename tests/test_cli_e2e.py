@@ -66,8 +66,6 @@ def test_cli_argument_parsing():
     search_parser.add_argument("--output-format", type=str, default="markdown",
                                choices=["markdown", "json"])
     search_parser.add_argument("--min-community-rank", type=int, default=0)
-    search_parser.add_argument("--target-index", type=str,
-                               choices=["main", "entity", "community", "both"])
     
     # Test parsing with all arguments
     args = parser.parse_args([
@@ -85,31 +83,6 @@ def test_cli_argument_parsing():
     assert args.response_type == "Multiple Paragraphs"
     assert args.output_format == "json"
     assert args.min_community_rank == 5
-
-
-def test_cli_backward_compatibility_parsing():
-    """Test backward compatibility with --target-index argument."""
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest="command")
-    
-    search_parser = subparsers.add_parser("search")
-    search_parser.add_argument("query", type=str)
-    search_parser.add_argument("--mode", type=str, default="global",
-                               choices=["local", "global", "drift", "auto"])
-    search_parser.add_argument("--target-index", type=str,
-                               choices=["main", "entity", "community", "both"])
-    
-    # Test with deprecated --target-index
-    args = parser.parse_args([
-        "search",
-        "test query",
-        "--target-index", "community"
-    ])
-    
-    assert args.command == "search"
-    assert args.query == "test query"
-    assert args.target_index == "community"
-    assert args.mode == "global"  # default
 
 
 def test_search_mode_router_import():
@@ -294,3 +267,19 @@ def test_cli_integration_mock():
         Path(config_path).unlink()
         if "ANTHROPIC_API_KEY" in os.environ:
             del os.environ["ANTHROPIC_API_KEY"]
+
+def test_router_raises_when_drift_retriever_missing():
+    """DRIFT が未初期化なら Global へ退避せず例外にする。"""
+    import pytest
+    from llama_index.core.schema import QueryBundle
+    from graphrag_anthropic_llamaindex.global_search.router import SearchMode, SearchModeRouter
+
+    router = object.__new__(SearchModeRouter)
+    router.mode = SearchMode.DRIFT
+    router.local_retriever = None
+    router.drift_retriever = None
+    router.global_retriever = object()
+    router.route = lambda query: SearchMode.DRIFT
+
+    with pytest.raises(RuntimeError, match="DRIFT"):
+        router._retrieve(QueryBundle(query_str="q"))

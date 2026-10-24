@@ -201,8 +201,7 @@ class LocalSearchRetriever(BaseRetriever):
             )
             return response.text
         else:
-            # Fallback
-            return "LLM response not available"
+            raise TypeError(f"LLM {type(self.llm).__name__} は complete / acomplete を持ちません")
     
     def _create_empty_response(self, query: str) -> List[NodeWithScore]:
         """Create an empty response when no entities are found."""

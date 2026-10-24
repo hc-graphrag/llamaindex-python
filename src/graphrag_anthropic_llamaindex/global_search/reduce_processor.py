@@ -103,19 +103,13 @@ class ReduceProcessor:
         )
         
         # LLMを呼び出して最終回答を生成
-        try:
-            # Use proper LlamaIndex ChatMessage format for Bedrock compatibility
-            from llama_index.core.llms import ChatMessage, MessageRole
-            
-            messages = [
-                ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
-                ChatMessage(role=MessageRole.USER, content=user_prompt)
-            ]
-            response = self.llm.chat(messages)
-            final_response = str(response)
-        except Exception as e:
-            logger.error(f"Reduce処理中のLLM呼び出しエラー: {e}")
-            final_response = self._create_fallback_response(top_key_points, query)
+        from llama_index.core.llms import ChatMessage, MessageRole
+
+        messages = [
+            ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
+            ChatMessage(role=MessageRole.USER, content=user_prompt)
+        ]
+        final_response = str(self.llm.chat(messages))
         
         # トレーサビリティ情報を構築
         traceability = self._build_traceability(all_key_points)
@@ -174,21 +168,6 @@ class ReduceProcessor:
             chunk_ids=list(all_chunk_ids),
             entity_ids=list(all_entity_ids)
         )
-    
-    def _create_fallback_response(self, key_points: List[KeyPoint], query: str) -> str:
-        """LLM呼び出しが失敗した場合のフォールバック応答を作成"""
-        response_lines = []
-        response_lines.append(f"クエリ「{query}」に関する情報:")
-        response_lines.append("")
-        
-        # 重要度順にキーポイントを列挙
-        for i, kp in enumerate(key_points[:10], 1):
-            response_lines.append(f"{i}. {kp.description}")
-        
-        response_lines.append("")
-        response_lines.append("（注：この応答は自動生成されたものです）")
-        
-        return "\n".join(response_lines)
     
     def format_output(
         self,

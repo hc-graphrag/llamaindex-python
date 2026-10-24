@@ -35,33 +35,10 @@ class FixedLanceDBVectorStore(LanceDBVectorStore):
             return super().query(query, **kwargs)
 
         except AttributeError as e:
-            if "'LanceEmptyQueryBuilder' object has no attribute 'nprobes'" in str(e):
-                logger.warning(f"LanceDB query failed due to empty query builder, attempting direct query. "
-                              f"Table: {self._table_name}")
-
-                # Try direct LanceDB query as fallback
-                try:
-                    return self._direct_lancedb_query(query, **kwargs)
-                except Exception as direct_error:
-                    logger.error(f"Direct LanceDB query also failed: {direct_error}")
-                    # Return empty results when both methods fail
-                    return VectorStoreQueryResult(
-                        nodes=[],
-                        similarities=[],
-                        ids=[]
-                    )
-            else:
-                # Re-raise other AttributeErrors
+            if "'LanceEmptyQueryBuilder' object has no attribute 'nprobes'" not in str(e):
                 raise
-
-        except Exception as e:
-            logger.error(f"LanceDB query failed with unexpected error: {e}")
-            # Return empty results for other query failures too
-            return VectorStoreQueryResult(
-                nodes=[],
-                similarities=[],
-                ids=[]
-            )
+            logger.warning(f"LanceDB の未インデックステーブルで nprobes エラー。直接クエリを実行します。Table: {self._table_name}")
+            return self._direct_lancedb_query(query, **kwargs)
 
     def _direct_lancedb_query(self, query: VectorStoreQuery, **kwargs: Any) -> VectorStoreQueryResult:
         """
