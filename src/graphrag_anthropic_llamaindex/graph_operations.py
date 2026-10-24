@@ -1,5 +1,5 @@
 import networkx as nx
-from graspologic.partition import hierarchical_leiden
+from graspologic_native import hierarchical_leiden
 
 # Adapted from ms-graphrag/graphrag/index/utils/stable_lcc.py
 def stable_largest_connected_component(graph: nx.Graph) -> nx.Graph:
@@ -41,15 +41,16 @@ def _compute_leiden_communities(
     for edge in graph.edges():
         int_graph.add_edge(node_to_int[edge[0]], node_to_int[edge[1]])
 
-    # Use graspologic's hierarchical leiden algorithm
+    # graspologic_native.hierarchical_leiden はエッジ表 (str, str, weight) を受け取る
+    edges = [(str(u), str(v), 1.0) for u, v in int_graph.edges()]
     hierarchical_clusters = hierarchical_leiden(
-        int_graph,
+        edges,
         max_cluster_size=max_cluster_size,
         resolution=1.0,
         randomness=0.001,
-        random_seed=seed
+        seed=seed,
     )
-    
+
     # Process hierarchical clustering results
     results: dict[int, dict[str, int]] = {}
     hierarchy: dict[int, int] = {}
@@ -58,7 +59,7 @@ def _compute_leiden_communities(
     for hcluster in hierarchical_clusters:
         cluster_level = hcluster.level
         cluster_id = hcluster.cluster
-        int_node = hcluster.node
+        int_node = int(hcluster.node)
         parent_cluster_id = hcluster.parent_cluster
         
         # Initialize level in results if not exists
