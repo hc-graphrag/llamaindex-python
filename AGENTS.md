@@ -21,7 +21,7 @@
 - Tests: `pytest -q` (runs under `tests/`).
 
 ## Coding Style & Naming Conventions
-- Python ≥3.10. Use PEP 8, 4-space indentation, type hints where practical.
+- Python ≥3.11. Use PEP 8, 4-space indentation, type hints where practical.
 - Names: modules/functions/vars `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE_CASE`.
 - Keep functions short and single-responsibility; add docstrings for public APIs.
 - Follow existing patterns in `vector_store_manager.py`, `document_processor.py`, and `search_processor.py`.
