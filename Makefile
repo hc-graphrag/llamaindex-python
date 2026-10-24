@@ -12,6 +12,11 @@ help: ## ヘルプを表示
 
 # Docker Compose設定
 COMPOSE_FILE = docker/docker-compose.yml
+
+# コンテナ内ユーザーの UID/GID をホストに合わせる (bind mount 上のファイルがホストのユーザー所有になる)。
+# root (UID 0) はコンテナ内の app ユーザーにできないため 1000 に置き換える。
+export HOST_UID := $(shell u=$$(id -u); [ "$$u" = 0 ] && echo 1000 || echo $$u)
+export HOST_GID := $(shell g=$$(id -g); [ "$$g" = 0 ] && echo 1000 || echo $$g)
 SERVICE_NAME = graphrag-app
 
 # 環境構築
@@ -23,72 +28,52 @@ setup: ## 初期環境をセットアップ
 		echo "📝 docker/.env ファイルを作成しました。APIキーを設定してください。"; \
 	fi
 	@if [ ! -f config.yaml ]; then \
-		echo "📄 config.yaml サンプルを作成中..."; \
-		cat > config.yaml << 'EOF'; \
-anthropic:; \
-  api_key: "your-api-key-will-be-set-by-env"; \
-  model: "claude-3-opus-20240229"; \
-; \
-input_dir: "/app/data"; \
-output_dir: "/app/graphrag_output"; \
-; \
-embedding_model:; \
-  name: "intfloat/multilingual-e5-small"; \
-; \
-chunking:; \
-  chunk_size: 1024; \
-  chunk_overlap: 20; \
-; \
-ignore_patterns:; \
-  - "*.tmp"; \
-  - ".git/*"; \
-  - "__pycache__/*"; \
-EOF; \
-		echo "📄 config.yaml ファイルを作成しました。"; \
+		cp docker/config.docker.yaml config.yaml; \
+		echo "📄 config.yaml ファイルを作成しました（docker/config.docker.yaml から）。"; \
 	fi
 	@echo "✅ セットアップ完了！"
 
 # Docker操作
 build: ## Dockerイメージをビルド
 	@echo "🏗️  Dockerイメージをビルド中..."
-	@docker-compose -f $(COMPOSE_FILE) build
+	@docker compose -f $(COMPOSE_FILE) build
 
 up: setup ## コンテナを起動（デタッチモード）
 	@echo "🚀 GraphRAG アプリを起動中..."
-	@docker-compose -f $(COMPOSE_FILE) up -d
+	@docker compose -f $(COMPOSE_FILE) up -d
 	@echo "✅ アプリが起動しました: http://localhost:7860"
 
 down: ## コンテナを停止・削除
 	@echo "🛑 コンテナを停止中..."
-	@docker-compose -f $(COMPOSE_FILE) down
+	@docker compose -f $(COMPOSE_FILE) down
 
 restart: ## コンテナを再起動
 	@echo "🔄 コンテナを再起動中..."
-	@docker-compose -f $(COMPOSE_FILE) restart
+	@docker compose -f $(COMPOSE_FILE) restart
 
 # ログ・ステータス確認
 logs: ## リアルタイムログを表示
 	@echo "📋 ログを表示中... (Ctrl+C で終了)"
-	@docker-compose -f $(COMPOSE_FILE) logs -f
+	@docker compose -f $(COMPOSE_FILE) logs -f
 
 logs-tail: ## 最新のログを表示（最後の50行）
-	@docker-compose -f $(COMPOSE_FILE) logs --tail=50
+	@docker compose -f $(COMPOSE_FILE) logs --tail=50
 
 status: ## コンテナの状態を確認
 	@echo "📊 コンテナ状態:"
-	@docker-compose -f $(COMPOSE_FILE) ps
+	@docker compose -f $(COMPOSE_FILE) ps
 	@echo ""
 	@echo "🔍 ヘルスチェック:"
-	@docker ps --filter "name=$(SERVICE_NAME)" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@docker ps --filter "label=com.docker.compose.service=$(SERVICE_NAME)" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 # 開発用
 dev: ## 開発モードで起動（フォアグラウンド）
 	@echo "💻 開発モードで起動中..."
-	@docker-compose -f $(COMPOSE_FILE) up
+	@docker compose -f $(COMPOSE_FILE) up
 
 shell: ## コンテナ内でシェルを起動
 	@echo "🐚 コンテナ内シェルに接続中..."
-	@docker-compose -f $(COMPOSE_FILE) exec $(SERVICE_NAME) bash
+	@docker compose -f $(COMPOSE_FILE) exec $(SERVICE_NAME) bash
 
 # テスト・検証
 test: ## アプリの動作確認
@@ -102,19 +87,19 @@ test: ## アプリの動作確認
 
 health: ## ヘルスチェック実行
 	@echo "🏥 ヘルスチェック実行中..."
-	@docker-compose -f $(COMPOSE_FILE) exec $(SERVICE_NAME) curl -f http://localhost:7860/ || echo "❌ ヘルスチェック失敗"
+	@docker compose -f $(COMPOSE_FILE) exec $(SERVICE_NAME) curl -fsS -o /dev/null http://localhost:7860/ && echo "✅ ヘルスチェック成功" || echo "❌ ヘルスチェック失敗"
 
 # クリーンアップ
 clean: ## コンテナ・イメージ・ボリュームを削除
 	@echo "🧹 クリーンアップ中..."
-	@docker-compose -f $(COMPOSE_FILE) down -v --remove-orphans
+	@docker compose -f $(COMPOSE_FILE) down -v --remove-orphans
 	@docker system prune -f
 	@echo "✅ クリーンアップ完了"
 
 clean-all: ## 全てのDocker関連リソースを削除（注意）
 	@echo "⚠️  警告: 全てのDockerリソースを削除します"
 	@read -p "続行しますか？ (y/N): " confirm && [ "$$confirm" = "y" ]
-	@docker-compose -f $(COMPOSE_FILE) down -v --remove-orphans
+	@docker compose -f $(COMPOSE_FILE) down -v --remove-orphans
 	@docker system prune -a -f --volumes
 	@echo "✅ 全クリーンアップ完了"
 
@@ -135,7 +120,7 @@ info: ## システム情報を表示
 	@echo "📋 GraphRAG Anthropic LlamaIndex システム情報"
 	@echo "================================================"
 	@echo "🐳 Docker バージョン: $(shell docker --version)"
-	@echo "🐙 Docker Compose バージョン: $(shell docker-compose --version)"
+	@echo "🐙 Docker Compose バージョン: $(shell docker compose version)"
 	@echo "📁 プロジェクトディレクトリ: $(shell pwd)"
 	@echo "📄 設定ファイル: $(COMPOSE_FILE)"
 	@echo "🌐 アプリURL: http://localhost:7860"
@@ -192,5 +177,5 @@ rebuild: clean build up ## 完全リビルド
 # 本番環境用
 prod-up: ## 本番環境用起動（ログレベル警告以上）
 	@echo "🏭 本番環境モードで起動中..."
-	@COMPOSE_FILE=$(COMPOSE_FILE) docker-compose up -d --remove-orphans
+	@COMPOSE_FILE=$(COMPOSE_FILE) docker compose up -d --remove-orphans
 	@echo "✅ 本番環境で起動完了"

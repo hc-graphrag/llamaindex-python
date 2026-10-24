@@ -1,0 +1,52 @@
+# Docker コンテナ用の設定 (`make setup` がプロジェクトルートの config.yaml としてコピーします)
+# コンテナ内の /app/config/config.yaml にマウントされ、Gradio UI の既定パスで読み込まれます。
+
+# コンテナ内には `claude` CLI のログインが無いため claude_code は使えません。
+# "anthropic" (環境変数 ANTHROPIC_API_KEY) または "bedrock" を選んでください。
+llm_provider: "anthropic"
+
+anthropic:
+  # api_key は環境変数 ANTHROPIC_API_KEY (docker/.env) から取得されます
+  model: "claude-sonnet-5-5"
+
+bedrock:
+  model: "anthropic.claude-3-sonnet-20240229-v1:0"
+  region: "us-east-1"
+
+embedding_model:
+  name: "intfloat/multilingual-e5-small"
+
+chunking:
+  chunk_size: 1024
+  chunk_overlap: 20
+
+# compose がマウントするコンテナ内のパス
+input_dir: "/app/data"
+output_dir: "/app/graphrag_output"
+
+ignore_patterns:
+  - "*.tmp"
+  - "*.log"
+  - "*.cache"
+  - "*.bak"
+  - "*.swp"
+  - "*.DS_Store"
+  - "Thumbs.db"
+  - ".git/*"
+  - ".gitignore"
+  - "__pycache__/*"
+  - "*.pyc"
+  - "node_modules/*"
+  - ".env"
+  - ".env.*"
+
+# ベクトルDBはマウントされた出力ディレクトリ配下に置き、コンテナを作り直しても消えないようにする
+vector_store:
+  type: "lancedb"
+  lancedb:
+    uri: "/app/graphrag_output/lancedb"
+
+community_detection:
+  max_cluster_size: 10
+  use_lcc: True
+  seed: 42

@@ -1,10 +1,12 @@
-version: '3.8'
-
 services:
   graphrag-app:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+      args:
+        # bind mount に書かれるファイルをホストのユーザー所有にする (Makefile が設定)
+        APP_UID: ${HOST_UID:-1000}
+        APP_GID: ${HOST_GID:-1000}
     container_name: graphrag-anthropic-app
     ports:
       - "7860:7860"
@@ -12,7 +14,7 @@ services:
       # Mount local directories to container
       - ../data:/app/data:ro                    # 入力ドキュメント（読み取り専用）
       - ../graphrag_output:/app/graphrag_output # 処理結果・インデックス
-      - ../config.yaml:/app/config.yaml:ro      # 設定ファイル（読み取り専用）
+      - ../config.yaml:/app/config/config.yaml:ro # 設定ファイル（読み取り専用。Gradio UIの既定パス）
       # ログや一時ファイル用
       - graphrag-logs:/app/logs
     environment:

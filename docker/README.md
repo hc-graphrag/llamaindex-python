@@ -37,28 +37,13 @@ echo "サンプルテキスト" > data/sample.txt
 ### 3. 設定ファイルの準備
 
 ```bash
-# config.yamlを作成（プロジェクトルートに配置）
-cat > config.yaml << EOF
-anthropic:
-  api_key: "your-api-key-will-be-set-by-env"
-  model: "claude-3-opus-20240229"
-
-input_dir: "/app/data"
-output_dir: "/app/graphrag_output"
-
-embedding_model:
-  name: "intfloat/multilingual-e5-small"
-
-chunking:
-  chunk_size: 1024
-  chunk_overlap: 20
-
-ignore_patterns:
-  - "*.tmp"
-  - ".git/*"
-  - "__pycache__/*"
-EOF
+# config.yaml を作成（プロジェクトルートに配置）。`make setup`（`make up` が内部で実行）でも作られます。
+cp docker/config.docker.yaml config.yaml
 ```
+
+コンテナは非 root ユーザー `app` で動きます。bind mount（`graphrag_output/` など）に書かれるファイルがホストのユーザー所有になるよう、`make build` / `make up` はホストの UID/GID をビルド引数（`APP_UID` / `APP_GID`）として渡します。`make setup` が先に `data/` と `graphrag_output/` を作るため、これらがホストのユーザー所有になります（Docker に作らせると root 所有になります）。
+
+コンテナ内には `claude` CLI のログインが無いため、`llm_provider` は `anthropic`（`docker/.env` の `ANTHROPIC_API_KEY`）または `bedrock` を使います。
 
 ### 4. アプリケーションの起動
 
@@ -99,7 +84,7 @@ open http://localhost:7860
 |-------------|-------------|------|-------|
 | `./data/` | `/app/data/` | 入力ドキュメント | 読み取り専用 |
 | `./graphrag_output/` | `/app/graphrag_output/` | 処理結果・インデックス | 読み書き |
-| `./config.yaml` | `/app/config.yaml` | 設定ファイル | 読み取り専用 |
+| `./config.yaml` | `/app/config/config.yaml` | 設定ファイル（Gradio UIの既定パス `config/config.yaml`） | 読み取り専用 |
 
 ## 🛠️ 管理コマンド
 

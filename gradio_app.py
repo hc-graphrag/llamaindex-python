@@ -6,12 +6,13 @@ import gradio as gr
 from dotenv import load_dotenv
 
 from llama_index.llms.anthropic import Anthropic
-from llama_index.llms.bedrock import Bedrock
+from llama_index.llms.bedrock_converse import BedrockConverse
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core import Settings
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import QueryBundle
 
+from src.graphrag_anthropic_llamaindex.claude_code_llm import ClaudeCodeLLM
 from src.graphrag_anthropic_llamaindex.config_manager import load_config
 from src.graphrag_anthropic_llamaindex.vector_store_manager import get_vector_store
 from src.graphrag_anthropic_llamaindex.global_search import SearchModeRouter
@@ -39,7 +40,11 @@ class GraphRAGApp:
             # LLMプロバイダーの設定を取得
             self.llm_provider = self.config.get("llm_provider", "anthropic")
             
-            if self.llm_provider == "bedrock":
+            if self.llm_provider == "claude_code":
+                # Claude Code (claude CLI) のサブスクリプション認証 - APIキー不要
+                model_name = self.config.get("claude_code", {}).get("model", "sonnet")
+                self.llm_params = {"model": model_name}
+            elif self.llm_provider == "bedrock":
                 # AWS Bedrock設定 - ANTHROPIC_API_KEYは不要
                 bedrock_config = self.config.get("bedrock", {})
                 model_name = bedrock_config.get("model", "anthropic.claude-3-sonnet-20240229-v1:0")
@@ -65,9 +70,9 @@ class GraphRAGApp:
                 # 環境変数からのみ取得
                 api_key = os.environ.get("ANTHROPIC_API_KEY")
                 if not api_key:
-                    return "❌ ANTHROPIC_API_KEY が環境変数に設定されていません。\nexport ANTHROPIC_API_KEY='your-api-key' で設定するか、\nAWS Bedrock を使用する場合は config/config.yaml で llm_provider: 'bedrock' を設定してください。"
+                    return "❌ ANTHROPIC_API_KEY が環境変数に設定されていません。\nexport ANTHROPIC_API_KEY='your-api-key' で設定するか、\nconfig/config.yaml で llm_provider: 'claude_code' (Claudeサブスクリプション) または 'bedrock' を設定してください。"
                     
-                model_name = anthropic_config.get("model", "claude-3-opus-20240229")
+                model_name = anthropic_config.get("model", "claude-sonnet-5-5")
                 api_base_url = anthropic_config.get("api_base_url")
                 
                 self.llm_params = {"model": model_name}
@@ -93,8 +98,12 @@ class GraphRAGApp:
             node_parser = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
             
             # Configure Settings based on provider
-            if self.llm_provider == "bedrock":
-                llm = Bedrock(**self.llm_params)
+            if self.llm_provider == "claude_code":
+                llm = ClaudeCodeLLM(**self.llm_params)
+                Settings.llm = llm
+                logger.info(f"Using Claude Code (subscription login) with model: {model_name}")
+            elif self.llm_provider == "bedrock":
+                llm = BedrockConverse(**self.llm_params)
                 Settings.llm = llm
                 logger.info(f"Using AWS Bedrock with model: {model_name}")
             else:
@@ -118,12 +127,12 @@ class GraphRAGApp:
     def search_chat(self, message: str, history: list, search_mode: str, response_type: str, output_format: str, min_community_rank: int, progress=gr.Progress()) -> tuple:
         if not self.is_initialized:
             error_msg = "❌ 設定が初期化されていません。まず設定タブで設定を読み込んでください。"
-            history.append([message, error_msg])
+            history.extend(self._chat_turn(message, error_msg))
             return "", history
         
         if not message.strip():
             error_msg = "❌ 検索クエリを入力してください。"
-            history.append([message, error_msg])
+            history.extend(self._chat_turn(message, error_msg))
             return "", history
         
         try:
@@ -176,15 +185,23 @@ class GraphRAGApp:
             else:
                 response = f"🔍 **検索モード**: {self._get_search_mode_name(search_mode)}\n\n結果が見つかりませんでした。"
             
-            history.append([message, response])
+            history.extend(self._chat_turn(message, response))
             return "", history
             
         except Exception as e:
             error_msg = f"❌ 検索に失敗しました: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            history.append([message, error_msg])
+            history.extend(self._chat_turn(message, error_msg))
             return "", history
     
+    @staticmethod
+    def _chat_turn(message: str, response: str) -> list:
+        """Chatbot (messages 形式) に追加する1往復分のメッセージ。"""
+        return [
+            {"role": "user", "content": message},
+            {"role": "assistant", "content": response},
+        ]
+
     def _get_search_mode_name(self, search_mode: str) -> str:
         mode_names = {
             "local": "ローカル検索（詳細・高精度）",
@@ -198,7 +215,7 @@ class GraphRAGApp:
 app = GraphRAGApp()
 
 def create_interface():
-    with gr.Blocks(title="GraphRAG Anthropic LlamaIndex", theme=gr.themes.Soft()) as interface:
+    with gr.Blocks(title="GraphRAG Anthropic LlamaIndex") as interface:
         gr.Markdown("# 🔗 GraphRAG Anthropic LlamaIndex Web App")
         gr.Markdown("CLIで作成されたインデックスを検索するためのWebインターフェース")
         
@@ -275,7 +292,7 @@ def create_interface():
                 label="検索チャット",
                 show_label=True,
                 height=400,
-                show_copy_button=True
+                buttons=["copy"]
             )
             
             with gr.Row():
@@ -398,7 +415,8 @@ def main():
         server_name="0.0.0.0",
         server_port=7860,
         share=False,
-        show_error=True
+        show_error=True,
+        theme=gr.themes.Soft()
     )
 
 if __name__ == "__main__":
