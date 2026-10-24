@@ -1,7 +1,7 @@
 # GraphRAG Anthropic LlamaIndex Makefile
 # Docker環境での開発・運用を簡単にするためのコマンド集
 
-.PHONY: help build up down restart logs status clean setup dev test
+.PHONY: help build up down restart logs status clean setup dev test claude-login claude-status
 
 # デフォルトターゲット
 help: ## ヘルプを表示
@@ -22,7 +22,7 @@ SERVICE_NAME = graphrag-app
 # 環境構築
 setup: ## 初期環境をセットアップ
 	@echo "🔧 初期環境をセットアップ中..."
-	@mkdir -p data graphrag_output
+	@mkdir -p data graphrag_output claude_home
 	@if [ ! -f docker/.env ]; then \
 		cp docker/.env.example docker/.env; \
 		echo "📝 docker/.env ファイルを作成しました。APIキーを設定してください。"; \
@@ -74,6 +74,12 @@ dev: ## 開発モードで起動（フォアグラウンド）
 shell: ## コンテナ内でシェルを起動
 	@echo "🐚 コンテナ内シェルに接続中..."
 	@docker compose -f $(COMPOSE_FILE) exec $(SERVICE_NAME) bash
+
+claude-login: ## コンテナ内で Claude にログイン (本人が一度だけ。claude_home/ に保存)
+	@docker compose -f $(COMPOSE_FILE) exec $(SERVICE_NAME) claude auth login
+
+claude-status: ## コンテナ内の Claude ログイン状態を表示 (未ログインは終了コード 1)
+	@docker compose -f $(COMPOSE_FILE) exec -T $(SERVICE_NAME) claude auth status
 
 # テスト・検証
 test: ## アプリの動作確認

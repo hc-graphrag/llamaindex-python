@@ -37,6 +37,10 @@ EXPOSE 7860
 
 # Set environment variables
 ENV PYTHONPATH=/app
+# claude_code プロバイダ: ログイン状態 (~/.claude と .claude.json) をここへ置き、bind mount で永続化する
+ENV CLAUDE_CONFIG_DIR=/home/app/.claude
+# claude-agent-sdk の wheel に同梱された CLI を PATH に通す (`claude auth login` 用)
+ENV PATH=/app/.venv/lib/python3.11/site-packages/claude_agent_sdk/_bundled:$PATH
 ENV GRADIO_SERVER_NAME=0.0.0.0
 ENV GRADIO_SERVER_PORT=7860
 

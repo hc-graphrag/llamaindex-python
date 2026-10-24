@@ -157,3 +157,54 @@ def test_env_example_has_no_active_empty_credential():
     """`make setup` が docker/.env にコピーするため、有効な行があると空の認証情報がコンテナへ渡る。"""
     example = (DOCKER / ".env.example").read_text()
     assert not re.search(r"^(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)=", example, re.M)
+
+
+# --- ayanomics 型: claude の設定ディレクトリを永続化し、コンテナ内で本人が一度だけログインする ---
+
+CLAUDE_CONFIG_IN_CONTAINER = "/home/app/.claude"
+
+
+def test_dockerfile_points_claude_config_dir_at_the_persisted_path():
+    dockerfile = (DOCKER / "Dockerfile").read_text()
+    assert re.search(rf"^ENV CLAUDE_CONFIG_DIR={CLAUDE_CONFIG_IN_CONTAINER}$", dockerfile, re.M)
+
+
+def test_dockerfile_puts_the_bundled_claude_cli_on_path():
+    """`claude auth login` を実行できるよう、claude-agent-sdk に同梱された CLI を PATH に通す。"""
+    dockerfile = (DOCKER / "Dockerfile").read_text()
+    assert re.search(r"^ENV PATH=\S*claude_agent_sdk/_bundled\S*:\$PATH$", dockerfile, re.M)
+
+
+def test_compose_bind_mounts_claude_config_dir_from_the_host():
+    """名前付きボリュームではなく bind mount にして、ホストから状態を確認でき、ホストのユーザー所有になるようにする。"""
+    compose = yaml.safe_load((DOCKER / "docker-compose.yml").read_text())
+    volumes = compose["services"]["graphrag-app"]["volumes"]
+    assert f"../claude_home:{CLAUDE_CONFIG_IN_CONTAINER}" in volumes
+
+
+def test_claude_home_is_not_tracked_by_git():
+    """ログイン済みのトークンが入るため、Git 管理外にする。"""
+    ignored = (ROOT / ".gitignore").read_text().splitlines()
+    assert "/claude_home" in ignored
+
+
+def test_makefile_has_login_and_status_targets():
+    makefile = (ROOT / "Makefile").read_text()
+    login = re.search(r"^claude-login:.*\n((?:\t.*\n)+)", makefile, re.M).group(1)
+    status = re.search(r"^claude-status:.*\n((?:\t.*\n)+)", makefile, re.M).group(1)
+    # ブラウザ承認のコードを貼る必要があるため、TTY を割り当てる (compose v2 の exec は既定で TTY あり)
+    assert "exec" in login and "claude auth login" in login and "-T" not in login
+    assert "exec" in status and "claude auth status" in status
+
+
+@pytest.mark.skipif(shutil.which("make") is None, reason="make が無い")
+def test_make_setup_creates_claude_home_owned_by_the_host_user(tmp_path):
+    """Docker に作らせると root 所有になり、コンテナの app ユーザーが書き込めない。"""
+    (tmp_path / "docker").mkdir()
+    shutil.copy(ROOT / "Makefile", tmp_path / "Makefile")
+    shutil.copy(DOCKER / ".env.example", tmp_path / "docker" / ".env.example")
+    shutil.copy(CONTAINER_CONFIG, tmp_path / "docker" / CONTAINER_CONFIG.name)
+
+    subprocess.run(["make", "setup"], cwd=tmp_path, capture_output=True, text=True, check=True)
+
+    assert (tmp_path / "claude_home").is_dir()

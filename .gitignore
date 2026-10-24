@@ -7,6 +7,7 @@ __pycache__/
 .env
 .venv
 config/config.yaml
+/claude_home
 /config.yaml
 !scripts/demo_dataset/config.yaml
 

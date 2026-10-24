@@ -15,6 +15,8 @@ services:
       - ../data:/app/data:ro                    # 入力ドキュメント（読み取り専用）
       - ../graphrag_output:/app/graphrag_output # 処理結果・インデックス
       - ../config.yaml:/app/config/config.yaml:ro # 設定ファイル（読み取り専用。Gradio UIの既定パス）
+      # claude_code のログイン状態 (`make claude-login` で本人が一度だけログイン。コピー・共有しない)
+      - ../claude_home:/home/app/.claude
       # ログや一時ファイル用
       - graphrag-logs:/app/logs
     environment:
