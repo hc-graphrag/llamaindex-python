@@ -20,7 +20,7 @@ echo "クリーンアップ完了。"
 
 # 2. データの追加と処理
 echo -e "\n2. ドキュメントの追加と処理 (add コマンド実行)..."
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config "$CONFIG_FILE" add
+pdm run python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" add
 if [ $? -ne 0 ]; then
     echo "エラー: ドキュメントの追加処理に失敗しました。"
     exit 1
@@ -36,7 +36,7 @@ TEST_FAILURES=0
 echo -e "\n--- 3.1. メインテキストインデックス検索テスト ---"
 QUERY_MAIN="AIの最新動向について教えてください"
 echo "クエリ: \"$QUERY_MAIN\""
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config "$CONFIG_FILE" search "$QUERY_MAIN" --mode local
+pdm run python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" search "$QUERY_MAIN" --mode local
 if [ $? -ne 0 ]; then
     echo "テスト失敗: メインテキストインデックス検索"
     TEST_FAILURES=$((TEST_FAILURES + 1))
@@ -48,7 +48,7 @@ fi
 echo -e "\n--- 3.2. エンティティインデックス検索テスト ---"
 QUERY_ENTITY="Acme CorpのCEOは誰ですか？"
 echo "クエリ: \"$QUERY_ENTITY\""
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config "$CONFIG_FILE" search "$QUERY_ENTITY" --mode local
+pdm run python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" search "$QUERY_ENTITY" --mode local
 if [ $? -ne 0 ]; then
     echo "テスト失敗: エンティティインデックス検索"
     TEST_FAILURES=$((TEST_FAILURES + 1))
@@ -60,7 +60,7 @@ fi
 echo -e "\n--- 3.3. コミュニティ要約インデックス検索テスト ---"
 QUERY_COMMUNITY="サステナブルテクノロジーに関するコミュニティはありますか？"
 echo "クエリ: \"$QUERY_COMMUNITY\""
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config "$CONFIG_FILE" search "$QUERY_COMMUNITY" --mode global
+pdm run python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" search "$QUERY_COMMUNITY" --mode global
 if [ $? -ne 0 ]; then
     echo "テスト失敗: コミュニティ要約インデックス検索"
     TEST_FAILURES=$((TEST_FAILURES + 1))
@@ -72,7 +72,7 @@ fi
 echo -e "\n--- 3.4. 全てのインデックス検索テスト ---"
 QUERY_BOTH="気候変動に関する主要な研究機関は？"
 echo "クエリ: \"$QUERY_BOTH\""
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config "$CONFIG_FILE" search "$QUERY_BOTH" --mode auto
+pdm run python -m graphrag_anthropic_llamaindex.main --config "$CONFIG_FILE" search "$QUERY_BOTH" --mode auto
 if [ $? -ne 0 ]; then
     echo "テスト失敗: 全てのインデックス検索"
     TEST_FAILURES=$((TEST_FAILURES + 1))

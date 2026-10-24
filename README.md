@@ -28,7 +28,7 @@ graphrag-anthropic-llamaindex/
 ├── config/                   # 設定ファイルディレクトリ
 │   ├── config.example.yaml   # 設定ファイルのテンプレート
 │   └── config_bedrock.yaml   # AWS Bedrock用設定例
-├── pyproject.toml            # Poetry のプロジェクト設定と依存関係
+├── pyproject.toml            # プロジェクト設定と依存関係 (PDM)
 ├── README.md                 # このファイル
 ├── data/                     # 処理対象のドキュメントを配置するディレクトリ (input_dir)
 │   ├── sample_document.txt
@@ -66,21 +66,28 @@ graphrag-anthropic-llamaindex/
     cd graphrag-anthropic-llamaindex
     ```
 
-2.  **Poetry のインストール (未導入の場合):**
+2.  **PDM のインストール (未導入の場合):**
     ```bash
-    curl -sSL https://install.python-poetry.org | python3 -
+    curl -sSL https://pdm-project.org/install-pdm.py | python3 -
     ```
+    Python は 3.11 以上 3.13 未満が必要です (`.tool-versions` は 3.11.11)。
 
 3.  **依存関係のインストール:**
     ```bash
-    poetry install
+    pdm install
     ```
 
 ## 設定
 
-### 1. 環境変数の設定
+### 1. LLM プロバイダと環境変数の設定
 
-`.env.example` を `.env` としてコピーし、APIキーを設定してください。
+`config/config.yaml` の `llm_provider` で LLM を選択します。
+
+*   `claude_code` (デフォルト): ログイン済みの `claude` CLI のサブスクリプションを claude-agent-sdk 経由で利用します。API キーは不要です(個人のローカル利用のみ)。
+*   `anthropic`: `ANTHROPIC_API_KEY` を `.env` または環境変数で指定します(YAML には書けません)。
+*   `bedrock`: AWS Bedrock (`BedrockConverse`) を利用します。
+
+`anthropic` を使う場合は、`.env.example` を `.env` としてコピーし、APIキーを設定してください。
 
 ```bash
 cp .env.example .env
@@ -114,7 +121,7 @@ cp config/config.example.yaml config/config.yaml
 `input_dir` で指定されたディレクトリ（デフォルト: `data/`）に処理したいドキュメント（TXT, CSV, PDF, DOCX, PPTX, HTML, EMLなど）を配置します。
 
 ```bash
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml add
+pdm run python -m graphrag_anthropic_llamaindex.main --config config/config.yaml add
 ```
 
 *   このコマンドは、`input_dir` 内の新しいドキュメントを読み込み、テキスト抽出、チャンキング、エンティティ・リレーションシップ抽出、コミュニティ検出、コミュニティ要約を行います。
@@ -128,7 +135,7 @@ poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/conf
 
 ```bash
 bash
-poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "あなたのクエリ" --mode <local|global|drift|auto>
+pdm run python -m graphrag_anthropic_llamaindex.main --config config/config.yaml search "あなたのクエリ" --mode <local|global|drift|auto>
 ```
 
 `--mode` には以下のいずれかを指定します(`config` の `search.mode` が指定されている場合はそちらが優先されます)。
@@ -142,19 +149,19 @@ poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/conf
 
 *   **デフォルト(global)での検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "AIの最新動向について教えてください"
+    pdm run python -m graphrag_anthropic_llamaindex.main --config config/config.yaml search "AIの最新動向について教えてください"
     ```
 *   **local モードでの検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "Acme CorpのCEOは誰ですか？" --mode local
+    pdm run python -m graphrag_anthropic_llamaindex.main --config config/config.yaml search "Acme CorpのCEOは誰ですか？" --mode local
     ```
 *   **global モードでの検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "サステナブルテクノロジーに関するコミュニティはありますか？" --mode global
+    pdm run python -m graphrag_anthropic_llamaindex.main --config config/config.yaml search "サステナブルテクノロジーに関するコミュニティはありますか？" --mode global
     ```
 *   **モード自動選択(--mode auto)での検索:**
     ```bash
-    poetry run python src/graphrag_anthropic_llamaindex/main.py --config config/config.yaml search "気候変動に関する主要な研究機関は？" --mode auto
+    pdm run python -m graphrag_anthropic_llamaindex.main --config config/config.yaml search "気候変動に関する主要な研究機関は？" --mode auto
     ```
 
 ## デモスクリプトの実行
