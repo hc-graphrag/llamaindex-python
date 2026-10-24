@@ -18,8 +18,12 @@ services:
       # ログや一時ファイル用
       - graphrag-logs:/app/logs
     environment:
-      # Anthropic API key (set in .env file or environment)
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # 認証情報はホスト環境または docker/.env に設定されている場合だけコンテナへ渡す。
+      # `NAME=${NAME}` と書くと未設定でも空文字が渡り、認証の優先順位を乱すため素の `- NAME` を使う。
+      # anthropic プロバイダ用 API キー
+      - ANTHROPIC_API_KEY
+      # claude_code プロバイダ用のサブスクリプション OAuth トークン (`claude setup-token` で発行)
+      - CLAUDE_CODE_OAUTH_TOKEN
       # Gradio settings
       - GRADIO_SERVER_NAME=0.0.0.0
       - GRADIO_SERVER_PORT=7860

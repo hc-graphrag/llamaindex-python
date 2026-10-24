@@ -43,7 +43,7 @@ cp docker/config.docker.yaml config.yaml
 
 コンテナは非 root ユーザー `app` で動きます。bind mount（`graphrag_output/` など）に書かれるファイルがホストのユーザー所有になるよう、`make build` / `make up` はホストの UID/GID をビルド引数（`APP_UID` / `APP_GID`）として渡します。`make setup` が先に `data/` と `graphrag_output/` を作るため、これらがホストのユーザー所有になります（Docker に作らせると root 所有になります）。
 
-コンテナ内には `claude` CLI のログインが無いため、`llm_provider` は `anthropic`（`docker/.env` の `ANTHROPIC_API_KEY`）または `bedrock` を使います。
+`llm_provider` は `anthropic`（`docker/.env` の `ANTHROPIC_API_KEY`）、`bedrock`、または `claude_code`（`docker/.env` の `CLAUDE_CODE_OAUTH_TOKEN`、個人利用のみ）を使えます。`claude_code` の手順と注意点は [docs/guides/docker-claude-subscription.md](../docs/guides/docker-claude-subscription.md) を参照してください。
 
 ### 4. アプリケーションの起動
 

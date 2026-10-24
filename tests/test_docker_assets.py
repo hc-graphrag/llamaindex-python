@@ -137,3 +137,23 @@ def test_mount_points_are_owned_by_the_app_user():
     dockerfile = (DOCKER / "Dockerfile").read_text()
     assert re.search(r"chown -R app:app .*?/app", dockerfile)
     assert "/app/logs" in dockerfile  # 名前付きボリュームの初期所有者はイメージ側の同名ディレクトリから引き継がれる
+
+
+def test_compose_passes_credentials_only_when_set():
+    """`NAME=${NAME}` は未設定でも空文字をコンテナへ渡し、claude CLI の認証優先順位を乱す。素の `- NAME` で透過する。"""
+    compose = yaml.safe_load((DOCKER / "docker-compose.yml").read_text())
+    env = compose["services"]["graphrag-app"]["environment"]
+    assert "CLAUDE_CODE_OAUTH_TOKEN" in env and "ANTHROPIC_API_KEY" in env
+
+
+def test_env_example_documents_the_subscription_token():
+    example = (DOCKER / ".env.example").read_text()
+    assert "CLAUDE_CODE_OAUTH_TOKEN" in example
+    # 既定ではどの認証も有効にしない (コメントアウトのまま)
+    assert not re.search(r"^CLAUDE_CODE_OAUTH_TOKEN=", example, re.M)
+
+
+def test_env_example_has_no_active_empty_credential():
+    """`make setup` が docker/.env にコピーするため、有効な行があると空の認証情報がコンテナへ渡る。"""
+    example = (DOCKER / ".env.example").read_text()
+    assert not re.search(r"^(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)=", example, re.M)

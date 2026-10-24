@@ -11,6 +11,8 @@ ANTHROPIC_API_KEY は不要。ツールは全て無効化し、純粋なテキ�
 
 import asyncio
 import concurrent.futures
+import logging
+import os
 from typing import Any, AsyncGenerator, Generator
 
 from claude_agent_sdk import (
@@ -29,6 +31,11 @@ from llama_index.core.base.llms.types import (
 from llama_index.core.bridge.pydantic import Field
 from llama_index.core.llms.callbacks import llm_completion_callback
 from llama_index.core.llms.custom import CustomLLM
+
+logger = logging.getLogger(__name__)
+
+# claude CLI の認証では、これらが設定されているとサブスクリプションより優先される
+_OVERRIDING_CREDENTIALS = ("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY")
 
 # Claude Code が標準で持つツール。生成専用にするため全て拒否する。
 _BUILTIN_TOOLS = [
@@ -55,6 +62,13 @@ class ClaudeCodeLLM(CustomLLM):
         )
 
     def _options(self) -> ClaudeAgentOptions:
+        overriding = [name for name in _OVERRIDING_CREDENTIALS if os.environ.get(name)]
+        if overriding:
+            logger.warning(
+                "%s が設定されているため、サブスクリプションではなく API キー課金で実行されます。"
+                "サブスクリプションを使うなら環境から外してください。",
+                ", ".join(overriding),
+            )
         return ClaudeAgentOptions(
             model=self.model,
             system_prompt=self.system_prompt or None,

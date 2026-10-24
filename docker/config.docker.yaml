@@ -1,9 +1,13 @@
 # Docker コンテナ用の設定 (`make setup` がプロジェクトルートの config.yaml としてコピーします)
 # コンテナ内の /app/config/config.yaml にマウントされ、Gradio UI の既定パスで読み込まれます。
 
-# コンテナ内には `claude` CLI のログインが無いため claude_code は使えません。
-# "anthropic" (環境変数 ANTHROPIC_API_KEY) または "bedrock" を選んでください。
+# "anthropic" (環境変数 ANTHROPIC_API_KEY) / "bedrock" / "claude_code" から選びます。
+# claude_code はコンテナ内に `claude` のログインが無いため、docker/.env の CLAUDE_CODE_OAUTH_TOKEN
+# (`claude setup-token` で発行) が必要です。手順と注意点は docs/guides/docker-claude-subscription.md。
 llm_provider: "anthropic"
+
+claude_code:
+  model: "sonnet"
 
 anthropic:
   # api_key は環境変数 ANTHROPIC_API_KEY (docker/.env) から取得されます

@@ -80,3 +80,21 @@ def test_acomplete():
     with patch.object(claude_code_llm, "query", fake):
         out = asyncio.run(ClaudeCodeLLM().acomplete("x"))
     assert out.text == "async-ok"
+
+
+@pytest.mark.parametrize("name", ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"])
+def test_warns_when_api_credential_overrides_subscription(monkeypatch, caplog, name):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    monkeypatch.setenv(name, "sk-test")
+    with caplog.at_level("WARNING"):
+        ClaudeCodeLLM()._options()
+    assert name in caplog.text
+
+
+def test_no_warning_without_api_credentials(monkeypatch, caplog):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    with caplog.at_level("WARNING"):
+        ClaudeCodeLLM()._options()
+    assert caplog.text == ""
