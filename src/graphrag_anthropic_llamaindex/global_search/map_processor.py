@@ -10,8 +10,9 @@ import json
 import re
 
 from llama_index.core import Settings
+from graphrag_anthropic_llamaindex.llm_utils import get_configured_llm
 from llama_index.llms.anthropic import Anthropic
-from llama_index.llms.bedrock import Bedrock
+from llama_index.llms.bedrock_converse import BedrockConverse
 
 from .models import MapResult, KeyPoint
 from .prompts import MAP_SYSTEM_PROMPT, MAP_USER_PROMPT
@@ -46,13 +47,14 @@ class MapProcessor:
     def _get_or_create_llm(self, llm_config: Dict[str, Any]):
         """LLMインスタンスを取得または作成"""
         # 既にSettingsにLLMが設定されていればそれを使用
-        if Settings.llm is not None:
-            return Settings.llm
+        configured_llm = get_configured_llm()
+        if configured_llm is not None:
+            return configured_llm
         
         # 設定からLLMを作成
         provider = llm_config.get("provider", "anthropic")
         if provider == "bedrock":
-            return Bedrock(
+            return BedrockConverse(
                 model=llm_config.get("model", "anthropic.claude-3-sonnet-20240229-v1:0"),
                 region_name=llm_config.get("region", "us-east-1")
             )

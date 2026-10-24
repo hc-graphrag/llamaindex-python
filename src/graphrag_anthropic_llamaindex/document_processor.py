@@ -22,7 +22,7 @@ from graphrag_anthropic_llamaindex.db_manager import (
 )
 from graphrag_anthropic_llamaindex.file_filter import FileFilter
 from graphrag_anthropic_llamaindex.graph_operations import cluster_graph
-from graphrag_anthropic_llamaindex.llm_utils import parse_llm_json_output, extraction_prompt_template, summary_prompt_template, _get_full_llm_response_with_continuation
+from graphrag_anthropic_llamaindex.llm_utils import parse_llm_json_output, extraction_prompt_template, summary_prompt_template, _get_full_llm_response_with_continuation, require_configured_llm
 import fsspec
 import hashlib
 from pathlib import Path
@@ -63,10 +63,9 @@ def add_documents(
     print(f"Adding documents from '{input_dir}'...")
     
     # LLM設定の確認と初期化
-    if Settings.llm is None:
-        raise ValueError("LLMが設定されていません。main.pyでSettings.llmを設定してからadd_documentsを呼び出してください。")
-    
-    print(f"LLM設定確認: {type(Settings.llm).__name__}")
+    llm = require_configured_llm("LLMが設定されていません。main.pyでSettings.llmを設定してからadd_documentsを呼び出してください。")
+
+    print(f"LLM設定確認: {type(llm).__name__}")
     print(f"Embedding設定確認: {type(Settings.embed_model).__name__ if Settings.embed_model else 'None'}")
     
     # Initialize file filter if not provided

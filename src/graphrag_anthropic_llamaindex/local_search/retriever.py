@@ -5,8 +5,7 @@ import logging
 from typing import List, Optional, Dict, Any
 from llama_index.core.base.base_retriever import BaseRetriever
 from llama_index.core.schema import NodeWithScore, QueryBundle, TextNode
-from llama_index.core import Settings
-from llama_index.llms.anthropic import Anthropic
+from ..llm_utils import get_configured_llm
 
 from .entity_mapper import EntityMapper
 from .context_builder import LocalContextBuilder
@@ -62,24 +61,9 @@ class LocalSearchRetriever(BaseRetriever):
             format_style="structured"
         )
         
-        # Initialize LLM
-        if llm is not None:
-            self.llm = llm
-        else:
-            # Try to use Settings.llm but handle the case where it's not set
-            try:
-                if hasattr(Settings, '_llm') and Settings._llm is not None:
-                    self.llm = Settings._llm
-                else:
-                    # Default to Anthropic if available
-                    self.llm = Anthropic(
-                        model=config.get("llm", {}).get("model", "claude-3-5-sonnet-20241022"),
-                        temperature=config.get("llm", {}).get("temperature", 0.7)
-                    )
-            except Exception as e:
-                logger.warning(f"Failed to initialize LLM: {e}")
-                self.llm = None
-        
+        # LLM: 明示指定 > Settings に設定済みのLLM。どちらも無ければ None (コンテキストのみ返す)
+        self.llm = llm if llm is not None else get_configured_llm()
+
         # Store relationships (would be loaded from storage in production)
         self.relationships: List[Relationship] = []
     

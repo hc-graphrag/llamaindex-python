@@ -26,7 +26,7 @@ def test_bedrock_provider_no_api_key_required():
             with patch("sys.argv", ["main.py", "--config", "test.yaml", "search", "test query"]):
                 # Mock the necessary components
                 with patch("graphrag_anthropic_llamaindex.main.get_vector_store"):
-                    with patch("llama_index.llms.bedrock.Bedrock"):
+                    with patch("llama_index.llms.bedrock_converse.BedrockConverse"):
                         with patch("graphrag_anthropic_llamaindex.main.SearchModeRouter"):
                             # This should work without ANTHROPIC_API_KEY
                             from graphrag_anthropic_llamaindex.main import main

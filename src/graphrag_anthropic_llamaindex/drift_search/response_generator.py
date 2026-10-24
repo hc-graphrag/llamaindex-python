@@ -3,7 +3,7 @@
 import logging
 from typing import Any, AsyncGenerator, Dict, Optional
 
-from llama_index.core import Settings
+from graphrag_anthropic_llamaindex.llm_utils import require_configured_llm
 
 from .context_builder import ContextBuilder
 from .models import SearchContext
@@ -26,7 +26,7 @@ class ResponseGenerator:
             llm: LLM instance to use
             config: Response generation configuration
         """
-        self.llm = llm or Settings.llm
+        self.llm = llm or require_configured_llm("DRIFT応答生成にはLLMが必要です。llmを渡すか、Settings.llmを設定してください。")
         self.config = config or {}
         
         # Configuration

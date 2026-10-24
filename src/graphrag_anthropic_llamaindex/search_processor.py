@@ -2,6 +2,7 @@ import os
 from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage, Settings
 
 from graphrag_anthropic_llamaindex.vector_store_manager import get_index
+from graphrag_anthropic_llamaindex.llm_utils import get_configured_llm
 import asyncio
 import logging
 
@@ -164,7 +165,8 @@ def search_index(query, output_dir, llm_params, vector_store=None, entity_vector
         print("\n--- Configuration Debug ---")
         config = llm_params.get("config", {})
         print(f"Config keys: {list(config.keys())}")
-        print(f"LLM settings: {type(Settings.llm).__name__ if Settings.llm else 'None'}")
+        configured_llm = get_configured_llm()
+        print(f"LLM settings: {type(configured_llm).__name__ if configured_llm else 'None'}")
 
         try:
             from .drift_search import DriftSearchEngine

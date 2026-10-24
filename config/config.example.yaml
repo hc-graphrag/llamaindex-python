@@ -1,13 +1,17 @@
 # Configuration for graphrag-anthropic-llamaindex
 
-# LLMプロバイダー選択: "anthropic" or "bedrock"
-llm_provider: "bedrock"  # or "anthropic"
+# LLMプロバイダー選択: "claude_code" (claude CLIのサブスク認証、APIキー不要) / "anthropic" / "bedrock"
+llm_provider: "claude_code"
+
+# Claude Code使用時の設定 (事前に `claude login` が必要。個人のローカル利用専用)
+claude_code:
+  model: "sonnet"  # エイリアス(sonnet/opus/haiku)またはフルモデルID
 
 # Anthropic API直接使用時の設定
 anthropic:
   # api_key は環境変数 ANTHROPIC_API_KEY から取得されます
   # export ANTHROPIC_API_KEY='your-api-key' を実行してください
-  model: "claude-3-opus-20240620"
+  model: "claude-sonnet-5-5"
   # api_base_url: "https://api.anthropic.com"
 
 # AWS Bedrock使用時の設定

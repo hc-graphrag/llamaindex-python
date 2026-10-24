@@ -1,6 +1,23 @@
 import json
 from llama_index.core import Settings
 
+
+def get_configured_llm():
+    """明示的に設定された LLM を返す。未設定なら None。
+
+    `Settings.llm` を直接読むと、未設定時に LlamaIndex が既定の OpenAI LLM を解決しようとして
+    OPENAI_API_KEY 不足で例外になる。設定有無の判定には本関数を使う。
+    """
+    return Settings._llm
+
+
+def require_configured_llm(message):
+    """設定済みの LLM を返す。未設定なら message で ValueError を送出する。"""
+    llm = get_configured_llm()
+    if llm is None:
+        raise ValueError(message)
+    return llm
+
 def _stitch_responses(s1, s2):
     if not s1:
         return s2
@@ -24,8 +41,7 @@ def _get_full_llm_response_with_continuation(original_prompt, max_continuation_a
     """
     
     # LLM設定の確認
-    if Settings.llm is None:
-        raise ValueError("LLMが設定されていません。Settings.llmを設定してください。")
+    llm = require_configured_llm("LLMが設定されていません。Settings.llmを設定してください。")
     
     full_response_text = ""
     attempts = 0
@@ -44,7 +60,7 @@ def _get_full_llm_response_with_continuation(original_prompt, max_continuation_a
             )
         
         try:
-            response = Settings.llm.complete(current_prompt)
+            response = llm.complete(current_prompt)
         except Exception as e:
             print(f"LLM呼び出しエラー (試行 {attempts}/{max_continuation_attempts}): {e}")
             if attempts == max_continuation_attempts:

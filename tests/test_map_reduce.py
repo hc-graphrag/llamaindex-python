@@ -18,16 +18,16 @@ from graphrag_anthropic_llamaindex.global_search.models import (
 @pytest.fixture(autouse=True)
 def mock_llm_settings():
     """自動的にSettingsをモック"""
-    with patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings') as mock_map_settings, \
-         patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Settings') as mock_reduce_settings, \
+    with patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm') as mock_map_configured_llm, \
+         patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm') as mock_reduce_configured_llm, \
          patch('graphrag_anthropic_llamaindex.global_search.map_processor.Anthropic') as mock_map_anthropic, \
-         patch('graphrag_anthropic_llamaindex.global_search.map_processor.Bedrock') as mock_map_bedrock, \
+         patch('graphrag_anthropic_llamaindex.global_search.map_processor.BedrockConverse') as mock_map_bedrock, \
          patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Anthropic') as mock_reduce_anthropic, \
-         patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Bedrock') as mock_reduce_bedrock:
+         patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.BedrockConverse') as mock_reduce_bedrock:
         
         # Settingsのllmを常にNoneに設定
-        mock_map_settings.llm = None
-        mock_reduce_settings.llm = None
+        mock_map_configured_llm.return_value = None
+        mock_reduce_configured_llm.return_value = None
         
         # モックLLMを返すように設定
         mock_llm = Mock()
@@ -39,8 +39,8 @@ def mock_llm_settings():
         mock_reduce_bedrock.return_value = mock_llm
         
         yield {
-            'map_settings': mock_map_settings,
-            'reduce_settings': mock_reduce_settings,
+            'map_settings': mock_map_configured_llm,
+            'reduce_settings': mock_reduce_configured_llm,
             'map_anthropic': mock_map_anthropic,
             'map_bedrock': mock_map_bedrock,
             'reduce_anthropic': mock_reduce_anthropic,
@@ -121,20 +121,20 @@ class TestMapProcessor:
             assert processor.semaphore._value == 3
             mock_get_llm.assert_called_once_with(mock_llm_config)
     
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    def test_get_or_create_llm_with_existing(self, mock_settings, mock_llm_config, mock_llm):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    def test_get_or_create_llm_with_existing(self, mock_configured_llm, mock_llm_config, mock_llm):
         """既存のLLMがある場合のテスト"""
-        mock_settings.llm = mock_llm
+        mock_configured_llm.return_value = mock_llm
         
         processor = MapProcessor(llm_config=mock_llm_config)
         
         assert processor.llm == mock_llm
     
     @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Anthropic')
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    def test_get_or_create_llm_anthropic(self, mock_settings, mock_anthropic_class, mock_llm_config):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    def test_get_or_create_llm_anthropic(self, mock_configured_llm, mock_anthropic_class, mock_llm_config):
         """Anthropic LLMの作成をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         mock_anthropic = Mock()
         mock_anthropic_class.return_value = mock_anthropic
         
@@ -145,11 +145,11 @@ class TestMapProcessor:
             model="claude-3-opus-20240229"
         )
     
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Bedrock')
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    def test_get_or_create_llm_bedrock(self, mock_settings, mock_bedrock_class):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.BedrockConverse')
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    def test_get_or_create_llm_bedrock(self, mock_configured_llm, mock_bedrock_class):
         """Bedrock LLMの作成をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         mock_bedrock = Mock()
         mock_bedrock_class.return_value = mock_bedrock
         
@@ -168,10 +168,10 @@ class TestMapProcessor:
         )
     
     @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Anthropic')
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    def test_extract_key_points_json_format(self, mock_settings, mock_anthropic_class, mock_llm_config):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    def test_extract_key_points_json_format(self, mock_configured_llm, mock_anthropic_class, mock_llm_config):
         """JSON形式のレスポンスからのキーポイント抽出をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         mock_anthropic_class.return_value = Mock()
         processor = MapProcessor(llm_config=mock_llm_config)
         
@@ -206,10 +206,10 @@ class TestMapProcessor:
         assert key_points[1].description == "Second key point"
         assert key_points[1].score == 80
     
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    def test_extract_key_points_json_list_format(self, mock_settings, mock_llm_config):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    def test_extract_key_points_json_list_format(self, mock_configured_llm, mock_llm_config):
         """JSONリスト形式のレスポンスからの抽出をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = MapProcessor(llm_config=mock_llm_config)
         
         llm_response = '''
@@ -236,10 +236,10 @@ class TestMapProcessor:
         assert key_points[0].description == "Point 1"
         assert key_points[0].score == 85
     
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    def test_extract_key_points_text_format(self, mock_settings, mock_llm_config):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    def test_extract_key_points_text_format(self, mock_configured_llm, mock_llm_config):
         """テキスト形式のレスポンスからの抽出をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = MapProcessor(llm_config=mock_llm_config)
         
         llm_response = '''
@@ -260,10 +260,10 @@ class TestMapProcessor:
         assert any("first important paragraph" in kp.description for kp in key_points)
         assert any("Bullet point" in kp.description for kp in key_points)
     
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    def test_extract_from_text_with_bullets(self, mock_settings, mock_llm_config):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    def test_extract_from_text_with_bullets(self, mock_configured_llm, mock_llm_config):
         """箇条書きを含むテキストからの抽出をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = MapProcessor(llm_config=mock_llm_config)
         
         text = '''
@@ -284,10 +284,10 @@ class TestMapProcessor:
         assert "Third bullet point" in key_points[2].description
         assert "Numbered item" in key_points[3].description
     
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    def test_extract_metadata(self, mock_settings, mock_llm_config):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    def test_extract_metadata(self, mock_configured_llm, mock_llm_config):
         """メタデータ抽出をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = MapProcessor(llm_config=mock_llm_config)
         
         records = [
@@ -319,10 +319,10 @@ class TestMapProcessor:
         assert len(metadata["entity_ids"]) == 3  # 重複削除後
     
     @pytest.mark.asyncio
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    async def test_process_single_batch_success(self, mock_settings, mock_llm_config, sample_batch):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    async def test_process_single_batch_success(self, mock_configured_llm, mock_llm_config, sample_batch):
         """単一バッチ処理の成功ケースをテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = MapProcessor(llm_config=mock_llm_config)
         
         # モックLLM応答を設定
@@ -346,10 +346,10 @@ class TestMapProcessor:
             assert result.context_tokens == 100
     
     @pytest.mark.asyncio
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    async def test_process_single_batch_error(self, mock_settings, mock_llm_config, sample_batch):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    async def test_process_single_batch_error(self, mock_configured_llm, mock_llm_config, sample_batch):
         """単一バッチ処理のエラーケースをテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = MapProcessor(llm_config=mock_llm_config)
         
         with patch.object(processor, '_call_llm_async') as mock_call:
@@ -359,10 +359,10 @@ class TestMapProcessor:
                 await processor._process_single_batch(sample_batch, "test query", 0)
     
     @pytest.mark.asyncio
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    async def test_process_batch_parallel(self, mock_settings, mock_llm_config, sample_batches):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    async def test_process_batch_parallel(self, mock_configured_llm, mock_llm_config, sample_batches):
         """並列バッチ処理をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = MapProcessor(llm_config=mock_llm_config, max_concurrent=2)
         
         with patch.object(processor, '_process_single_batch') as mock_process:
@@ -392,10 +392,10 @@ class TestMapProcessor:
             assert "Point from batch 1" in results[1].key_points[0].description
     
     @pytest.mark.asyncio
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    async def test_process_batch_with_exception(self, mock_settings, mock_llm_config, sample_batches):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    async def test_process_batch_with_exception(self, mock_configured_llm, mock_llm_config, sample_batches):
         """例外を含む並列処理をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = MapProcessor(llm_config=mock_llm_config)
         
         with patch.object(processor, '_process_single_batch') as mock_process:
@@ -420,10 +420,10 @@ class TestMapProcessor:
             assert len(results[1].key_points) == 0  # エラーの場合は空の結果
     
     @pytest.mark.asyncio
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    async def test_call_llm_async(self, mock_settings, mock_llm_config, mock_llm):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    async def test_call_llm_async(self, mock_configured_llm, mock_llm_config, mock_llm):
         """非同期LLM呼び出しをテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = MapProcessor(llm_config=mock_llm_config)
         processor.llm = mock_llm
         mock_llm.chat.return_value = "LLM response"
@@ -510,10 +510,10 @@ class TestReduceProcessor:
             assert processor.response_type == "multiple paragraphs"
             mock_get_llm.assert_called_once_with(mock_llm_config)
     
-    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Settings')
-    def test_reduce_success(self, mock_settings, mock_llm_config, mock_llm, sample_map_results):
+    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
+    def test_reduce_success(self, mock_configured_llm, mock_llm_config, mock_llm, sample_map_results):
         """Reduce処理の成功ケースをテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = ReduceProcessor(llm_config=mock_llm_config)
         processor.llm = mock_llm
         
@@ -533,10 +533,10 @@ class TestReduceProcessor:
         # LLMが呼び出されたか確認
         mock_llm.chat.assert_called_once()
     
-    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Settings')
-    def test_reduce_with_llm_error(self, mock_settings, mock_llm_config, mock_llm, sample_map_results):
+    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
+    def test_reduce_with_llm_error(self, mock_configured_llm, mock_llm_config, mock_llm, sample_map_results):
         """LLMエラー時のフォールバックをテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = ReduceProcessor(llm_config=mock_llm_config)
         processor.llm = mock_llm
         mock_llm.chat.side_effect = Exception("LLM error")
@@ -552,10 +552,10 @@ class TestReduceProcessor:
         assert "test query" in result.response
         assert "自動生成されたもの" in result.response
     
-    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Settings')
-    def test_build_reduce_context(self, mock_settings, mock_llm_config):
+    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
+    def test_build_reduce_context(self, mock_configured_llm, mock_llm_config):
         """Reduceコンテキスト構築をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = ReduceProcessor(llm_config=mock_llm_config)
         
         key_points = [
@@ -570,10 +570,10 @@ class TestReduceProcessor:
         assert "90|Point 1|r1;r2;r3" in context  # 最初の3つのIDのみ
         assert "80|Point 2|r5" in context
     
-    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Settings')
-    def test_build_traceability(self, mock_settings, mock_llm_config):
+    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
+    def test_build_traceability(self, mock_configured_llm, mock_llm_config):
         """トレーサビリティ情報構築をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = ReduceProcessor(llm_config=mock_llm_config)
         
         key_points = [
@@ -606,10 +606,10 @@ class TestReduceProcessor:
         assert "e1" in traceability.entity_ids
         assert "e2" in traceability.entity_ids
     
-    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Settings')
-    def test_create_fallback_response(self, mock_settings, mock_llm_config):
+    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
+    def test_create_fallback_response(self, mock_configured_llm, mock_llm_config):
         """フォールバック応答作成をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = ReduceProcessor(llm_config=mock_llm_config)
         
         key_points = [
@@ -625,10 +625,10 @@ class TestReduceProcessor:
         assert "11. Point 10" not in response  # 最大10個まで
         assert "自動生成されたもの" in response
     
-    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Settings')
-    def test_format_output(self, mock_settings, mock_llm_config, sample_map_results):
+    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
+    def test_format_output(self, mock_configured_llm, mock_llm_config, sample_map_results):
         """出力フォーマッティングをテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = ReduceProcessor(llm_config=mock_llm_config)
         
         result = GlobalSearchResult(
@@ -656,10 +656,10 @@ class TestReduceProcessor:
         assert isinstance(json_output, dict)
         assert json_output["response"] == "Test response"
     
-    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Settings')
-    def test_key_point_sorting(self, mock_settings, mock_llm_config, mock_llm):
+    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
+    def test_key_point_sorting(self, mock_configured_llm, mock_llm_config, mock_llm):
         """キーポイントのスコアソートをテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = ReduceProcessor(llm_config=mock_llm_config)
         processor.llm = mock_llm
         
@@ -688,10 +688,10 @@ class TestReduceProcessor:
             scores = [kp.score for kp in called_key_points]
             assert scores == [95, 75, 50]
     
-    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Settings')
-    def test_top_key_points_limit(self, mock_settings, mock_llm_config, mock_llm):
+    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
+    def test_top_key_points_limit(self, mock_configured_llm, mock_llm_config, mock_llm):
         """上位20個のキーポイント制限をテスト"""
-        mock_settings.llm = None
+        mock_configured_llm.return_value = None
         processor = ReduceProcessor(llm_config=mock_llm_config)
         processor.llm = mock_llm
         
@@ -724,12 +724,12 @@ class TestIntegration:
     """MapとReduceの統合テスト"""
     
     @pytest.mark.asyncio
-    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.Settings')
-    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.Settings')
-    async def test_map_reduce_pipeline(self, mock_reduce_settings, mock_map_settings):
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    @patch('graphrag_anthropic_llamaindex.global_search.reduce_processor.get_configured_llm')
+    async def test_map_reduce_pipeline(self, mock_reduce_configured_llm, mock_map_configured_llm):
         """Map-Reduceパイプライン全体をテスト"""
-        mock_map_settings.llm = None
-        mock_reduce_settings.llm = None
+        mock_map_configured_llm.return_value = None
+        mock_reduce_configured_llm.return_value = None
         # Map処理
         map_processor = MapProcessor(
             llm_config={"provider": "anthropic"},

@@ -254,8 +254,9 @@ class TestLocalSearchRetriever:
     
     @patch('src.graphrag_anthropic_llamaindex.local_search.retriever.EntityMapper')
     @patch('src.graphrag_anthropic_llamaindex.local_search.retriever.LocalContextBuilder')
-    def test_retrieve_with_entities_no_llm(self, mock_builder_class, mock_mapper_class):
-        """Test retrieval with entities but no LLM."""
+    @patch('src.graphrag_anthropic_llamaindex.local_search.retriever.get_configured_llm', return_value=None)
+    def test_retrieve_with_entities_no_llm(self, mock_get_llm, mock_builder_class, mock_mapper_class):
+        """LLMが指定も設定もされていない場合は、コンテキストのみを返す。"""
         # Setup mocks
         mock_mapper = Mock()
         mock_mapper.map_query_to_entities.return_value = [
@@ -282,6 +283,18 @@ class TestLocalSearchRetriever:
         assert len(results) == 1
         assert results[0].score == 0.8
         assert results[0].node.text == "Test context"
+
+
+    @patch('src.graphrag_anthropic_llamaindex.local_search.retriever.EntityMapper')
+    @patch('src.graphrag_anthropic_llamaindex.local_search.retriever.LocalContextBuilder')
+    def test_llm_resolution_order(self, mock_builder_class, mock_mapper_class):
+        """LLMは 明示指定 > Settings に設定済みのLLM の順で解決する。"""
+        module = 'src.graphrag_anthropic_llamaindex.local_search.retriever.get_configured_llm'
+        explicit, configured = Mock(name="explicit"), Mock(name="configured")
+
+        with patch(module, return_value=configured):
+            assert LocalSearchRetriever(config={"output_dir": "."}, llm=explicit).llm is explicit
+            assert LocalSearchRetriever(config={"output_dir": "."}).llm is configured
 
 
 class TestDataLoader:

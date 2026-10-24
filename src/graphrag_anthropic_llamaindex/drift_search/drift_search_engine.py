@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Union
 
-from llama_index.core import Settings
+from graphrag_anthropic_llamaindex.llm_utils import require_configured_llm
 from llama_index.core.vector_stores.types import VectorStore
 
 from .context_builder import ContextBuilder
@@ -35,7 +35,7 @@ class DriftSearchEngine:
         """
         self.config = config.get("drift_search", {})
         self.vector_stores = vector_stores
-        self.llm = llm or Settings.llm
+        self.llm = llm or require_configured_llm("DRIFT検索にはLLMが必要です。llmを渡すか、Settings.llmを設定してください。")
         
         # Initialize components
         self.local_searcher = LocalSearcher(

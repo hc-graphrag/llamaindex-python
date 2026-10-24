@@ -4,11 +4,12 @@ import argparse
 from dotenv import load_dotenv
 
 from llama_index.llms.anthropic import Anthropic
-from llama_index.llms.bedrock import Bedrock
+from llama_index.llms.bedrock_converse import BedrockConverse
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core import Settings
 from llama_index.core.node_parser import SentenceSplitter
 
+from graphrag_anthropic_llamaindex.claude_code_llm import ClaudeCodeLLM
 from graphrag_anthropic_llamaindex.config_manager import load_config
 from graphrag_anthropic_llamaindex.vector_store_manager import get_vector_store
 from graphrag_anthropic_llamaindex.document_processor import add_documents
@@ -56,7 +57,10 @@ def main():
     llm_provider = config.get("llm_provider", "anthropic")  # デフォルトはanthropic
     api_base_url = None  # 初期化
     
-    if llm_provider == "bedrock":
+    if llm_provider == "claude_code":
+        # Claude Code (claude CLI) のサブスクリプション認証 - APIキー不要
+        model_name = config.get("claude_code", {}).get("model", "sonnet")
+    elif llm_provider == "bedrock":
         # AWS Bedrock設定 - ANTHROPIC_API_KEYは不要
         bedrock_config = config.get("bedrock", {})
         model_name = bedrock_config.get("model", "anthropic.claude-3-sonnet-20240229-v1:0")
@@ -74,9 +78,9 @@ def main():
         if not api_key:
             print("Error: ANTHROPIC_API_KEY not found in environment variables")
             print("Please set it using: export ANTHROPIC_API_KEY='your-api-key'")
-            print("Or use AWS Bedrock by setting llm_provider: 'bedrock' in config/config.yaml")
+            print("Or use the Claude subscription login via llm_provider: 'claude_code', or AWS Bedrock via 'bedrock' in config/config.yaml")
             sys.exit(1)
-        model_name = anthropic_config.get("model", "claude-3-opus-20240229")
+        model_name = anthropic_config.get("model", "claude-sonnet-5-5")
         api_base_url = anthropic_config.get("api_base_url")
 
     # Override input/output directories from command line if provided
@@ -106,7 +110,10 @@ def main():
     node_parser = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
     # Configure Settings based on provider
-    if llm_provider == "bedrock":
+    if llm_provider == "claude_code":
+        Settings.llm = ClaudeCodeLLM(model=model_name)
+        print(f"Using Claude Code (subscription login) with model: {model_name}")
+    elif llm_provider == "bedrock":
         # AWS Bedrock LLM設定
         bedrock_params = {
             "model": model_name,
@@ -122,7 +129,7 @@ def main():
             if aws_session_token:
                 bedrock_params["aws_session_token"] = aws_session_token
         
-        llm = Bedrock(**bedrock_params)
+        llm = BedrockConverse(**bedrock_params)
         Settings.llm = llm
         print(f"Using AWS Bedrock with model: {model_name}")
     else:

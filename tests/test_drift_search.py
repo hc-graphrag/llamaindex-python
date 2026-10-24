@@ -2,6 +2,7 @@
 
 import asyncio
 import pytest
+from llama_index.core.schema import TextNode
 from unittest.mock import AsyncMock, MagicMock, patch
 import numpy as np
 
@@ -134,28 +135,21 @@ class TestLocalSearcher:
         
         searcher = LocalSearcher(mock_vector_stores)
         
-        # Mock vector store query result
+        # ベクトルストアは TextNode のリストを返す (name は metadata から解決される)
         mock_result = MagicMock()
-        mock_node = MagicMock()
-        mock_node.node.node_id = "entity_1"
-        mock_result.nodes = [mock_node]
-        
+        mock_result.nodes = [
+            TextNode(id_="entity_1", text="Test Entity", metadata={"name": "Test Entity"})
+        ]
         mock_vector_stores["entity"].query.return_value = mock_result
-        
-        # Mock entity data
+
+        # entities.parquet の実スキーマ (name / type / description)
         with patch("graphrag_anthropic_llamaindex.drift_search.local_searcher.load_entities_db") as mock_load:
             import pandas as pd
             mock_load.return_value = pd.DataFrame([
-                {
-                    "id": "entity_1",
-                    "name": "Test Entity",
-                    "type": "TestType",
-                    "description": "Test Description",
-                    "attributes": {},
-                    "relationships": [],
-                }
+                {"name": "Test Entity", "type": "TestType", "description": "Test Description"},
+                {"name": "Other Entity", "type": "OtherType", "description": "Other"},
             ])
-            
+
             # Execute search
             results = await searcher.search_entities("test query")
             
@@ -219,34 +213,29 @@ class TestGlobalSearcher:
         
         searcher = GlobalSearcher(mock_vector_stores)
         
-        # Mock vector store query result
+        # ベクトルストアは TextNode のリストを返す (community_id は metadata から解決される)
         mock_result = MagicMock()
-        mock_node = MagicMock()
-        mock_node.node.node_id = "comm_1"
-        mock_result.nodes = [mock_node]
-        
+        mock_result.nodes = [
+            TextNode(id_="comm_1", text="Test Summary", metadata={"community_id": 1})
+        ]
         mock_vector_stores["community"].query.return_value = mock_result
-        
-        # Mock community data
+
+        # community_summaries.parquet の実スキーマ (community_id / summary / key_entities)
         with patch("graphrag_anthropic_llamaindex.drift_search.global_searcher.load_community_summaries_db") as mock_load:
             import pandas as pd
             mock_load.return_value = pd.DataFrame([
-                {
-                    "id": "comm_1",
-                    "title": "Test Community",
-                    "summary": "Test Summary",
-                    "entities": ["e1", "e2"],
-                    "level": 0,
-                }
+                {"community_id": 1, "summary": "Test Summary", "key_entities": ["e1", "e2"]},
+                {"community_id": 2, "summary": "Other Summary", "key_entities": ["e3"]},
             ])
-            
+
             # Execute search
             results = await searcher.search_communities("test query")
             
             assert len(results) == 1
-            assert results[0].title == "Test Community"
+            assert results[0].id == "1"
+            assert results[0].title == "Community 1"  # 要約Parquetに title 列は無い
             assert results[0].summary == "Test Summary"
-            assert len(results[0].entities) == 2
+            assert results[0].entities == ["e1", "e2"]
 
 
 class TestContextBuilder:
