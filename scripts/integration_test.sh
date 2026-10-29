@@ -7,7 +7,13 @@ echo "GraphRAG 統合テストスクリプト"
 echo "==================================================="
 
 CONFIG_FILE="config/config.yaml"
-OUTPUT_DIR=$(grep -E "^output_dir:" $CONFIG_FILE | awk '{print $2}' | tr -d '"' | tr -d '/.')
+# output_dir の値から前後の引用符だけを除去する（スラッシュ/ドットは保持）
+OUTPUT_DIR=$(grep -E "^output_dir:" "$CONFIG_FILE" | head -n1 | sed -E 's/^output_dir:[[:space:]]*//; s/^"(.*)"$/\1/; s/^'\''(.*)'\''$/\1/')
+
+if [ -z "$OUTPUT_DIR" ] || [ "$OUTPUT_DIR" = "/" ] || [ "$OUTPUT_DIR" = "." ]; then
+    echo "エラー: output_dir を設定ファイルから取得できませんでした。処理を中止します。"
+    exit 1
+fi
 
 # 1. 既存の出力データをクリーンアップ
 echo "1. 既存の出力データ ($OUTPUT_DIR) をクリーンアップ..."

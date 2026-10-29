@@ -48,7 +48,7 @@ def _compute_leiden_communities(
         max_cluster_size=max_cluster_size,
         resolution=1.0,
         randomness=0.001,
-        seed=seed,
+        seed=seed if seed is not None else 42,
     )
 
     # Process hierarchical clustering results

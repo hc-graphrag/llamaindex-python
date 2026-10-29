@@ -142,6 +142,7 @@ def add_documents(
         extracted_entities_list = []
         extracted_relationships_list = []
         entity_documents = [] # For entity vector store
+        entity_to_node_text = {} # entity name -> source chunk text (コミュニティ要約で再利用)
 
         print("Extracting entities and relationships from document chunks...")
         for i, node in enumerate(nodes):
@@ -154,6 +155,7 @@ def add_documents(
                     for entity in result.get('entities', []):
                         extracted_entities_list.append(entity)
                         entity_documents.append(Document(text=entity.get('name', ''), extra_info=entity))
+                        entity_to_node_text[entity.get('name', '')] = node.text
                     for relationship in result.get('relationships', []):
                         # Validate relationship structure
                         if validate_relationship(relationship):
@@ -205,7 +207,9 @@ def add_documents(
                 print(f"  Added {len(valid_relationships)} valid relationships to graph")
             else:
                 print("  No relationships found for community detection")
-                return
+                # リレーションが無くても return せず空グラフで続行する。
+                # cluster_graph() は空グラフで [] を返すためコミュニティ処理は自然にスキップされ、
+                # 後続のメインテキスト索引・エンティティ索引・processed_files 保存が確実に実行される。
             
             max_cluster_size = community_detection_config.get("max_cluster_size", 10)
             use_lcc = community_detection_config.get("use_lcc", True)
@@ -226,15 +230,7 @@ def add_documents(
                 extracted_community_summaries = []
                 community_summary_documents = [] # For community summary vector store
 
-                entity_to_node_text = {}
-                for node in nodes:
-                    temp_prompt = extraction_prompt_template.format(text=node.text)
-                    temp_json_output = _get_full_llm_response_with_continuation(temp_prompt)
-                    temp_result = parse_llm_json_output(temp_json_output)
-                    if temp_result:
-                        for entity in temp_result.get('entities', []):
-                            entity_to_node_text[entity.get('name', '')] = node.text
-                
+                # entity_to_node_text は上のエンティティ抽出ループで構築済み（LLM再抽出は不要）
                 for community_level, community_id, _, community_nodes in communities:
                     community_text_parts = []
                     key_entities_in_community = []

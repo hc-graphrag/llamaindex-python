@@ -189,32 +189,40 @@ class MapProcessor:
         
         # JSON形式のレスポンスを試みる
         try:
-            # JSONブロックを探す
-            json_match = re.search(r'```json\s*(.*?)\s*```', llm_response, re.DOTALL)
+            # ```json フェンス → 無ければ最初の { ... } ブロック → それも無ければ全文をJSONとして解釈
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', llm_response, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
-                data = json.loads(json_str)
-                
-                if isinstance(data, dict) and "key_points" in data:
-                    points = data["key_points"]
-                elif isinstance(data, list):
-                    points = data
-                else:
-                    points = []
-                
-                for point in points:
-                    if isinstance(point, dict):
-                        key_point = KeyPoint(
-                            description=point.get("description", ""),
-                            score=point.get("score", 50),
-                            report_ids=point.get("report_ids", report_ids[:3]),  # 上位3つのレポートIDを使用
-                            source_metadata=self._extract_metadata(records, point.get("report_ids", [])) or {}
-                        )
-                        key_points.append(key_point)
             else:
-                # JSON形式でない場合は、段落ごとに処理
+                brace_match = re.search(r'\{.*\}', llm_response, re.DOTALL)
+                json_str = brace_match.group(0) if brace_match else llm_response.strip()
+
+            data = json.loads(json_str)
+
+            # プロンプトは "points"、旧形式/テストは "key_points" を許容
+            if isinstance(data, dict):
+                points = data.get("points", data.get("key_points", []))
+            elif isinstance(data, list):
+                points = data
+            else:
+                points = []
+            if not isinstance(points, list):
+                points = []
+
+            for point in points:
+                if isinstance(point, dict):
+                    key_point = KeyPoint(
+                        description=point.get("description", ""),
+                        score=point.get("score", 50),
+                        report_ids=point.get("report_ids", report_ids[:3]),
+                        source_metadata=self._extract_metadata(records, point.get("report_ids", [])) or {}
+                    )
+                    key_points.append(key_point)
+
+            # JSONは取れたが有効なpointsが無い場合はテキスト抽出にフォールバック
+            if not key_points:
                 key_points = self._extract_from_text(llm_response, report_ids, records)
-                
+
         except json.JSONDecodeError:
             # JSONパースに失敗した場合は、テキスト形式として処理
             key_points = self._extract_from_text(llm_response, report_ids, records)

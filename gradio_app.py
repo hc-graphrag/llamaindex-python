@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 import gradio as gr
 from dotenv import load_dotenv
@@ -33,7 +34,14 @@ class GraphRAGApp:
     
     def initialize_config(self, config_path: str = "config/config.yaml") -> str:
         try:
-            self.config = load_config(config_path)
+            # UI からの任意パス読み込みを作業ディレクトリ配下に限定する
+            # (/etc/passwd やマウント済み認証ファイルの読み出しを防ぐ)
+            base_dir = Path(os.environ.get("GRAPHRAG_CONFIG_BASE", os.getcwd())).resolve()
+            requested = Path(config_path).resolve()
+            if requested != base_dir and base_dir not in requested.parents:
+                logger.warning("許可範囲外の設定ファイルパスが指定されました: %s", config_path)
+                return "❌ 設定ファイルパスは作業ディレクトリ配下を指定してください"
+            self.config = load_config(str(requested))
             if not self.config:
                 return "❌ 設定ファイルの読み込みに失敗しました"
             
@@ -409,13 +417,32 @@ def create_interface():
     
     return interface
 
+def _parse_gradio_auth():
+    """GRADIO_AUTH="user:password" を (user, password) に変換。未設定なら None。"""
+    raw = os.environ.get("GRADIO_AUTH", "").strip()
+    if not raw or ":" not in raw:
+        return None
+    user, _, password = raw.partition(":")
+    return (user, password)
+
 def main():
     interface = create_interface()
+    # 既定は 127.0.0.1。外部公開する場合は環境変数で明示し、認証も設定する。
+    server_name = os.environ.get("GRADIO_SERVER_NAME", "127.0.0.1")
+    server_port = int(os.environ.get("GRADIO_SERVER_PORT", "7860"))
+    auth = _parse_gradio_auth()
+    if server_name not in ("127.0.0.1", "localhost") and auth is None:
+        logger.warning(
+            "Gradio を %s で公開しますが GRADIO_AUTH が未設定です。"
+            "ホスト側ポートを 127.0.0.1 に限定するか GRADIO_AUTH を設定してください。",
+            server_name,
+        )
     interface.launch(
-        server_name="0.0.0.0",
-        server_port=7860,
+        server_name=server_name,
+        server_port=server_port,
         share=False,
         show_error=True,
+        auth=auth,
         theme=gr.themes.Soft()
     )
 

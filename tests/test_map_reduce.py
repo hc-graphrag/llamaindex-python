@@ -235,7 +235,22 @@ class TestMapProcessor:
         assert len(key_points) == 2
         assert key_points[0].description == "Point 1"
         assert key_points[0].score == 85
-    
+
+    @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
+    def test_extract_key_points_prompt_format_without_fence(self, mock_configured_llm, mock_llm_config):
+        """MAP_SYSTEM_PROMPT が要求する形式（フェンスなし、points キー）からの抽出をテスト"""
+        mock_configured_llm.return_value = None
+        processor = MapProcessor(llm_config=mock_llm_config)
+
+        llm_response = '{"points": [{"description": "Point A [Data: Reports (1, 2)]", "score": 90}, {"description": "Point B", "score": 40}]}'
+
+        key_points = processor.extract_key_points(llm_response, ["r1"], [])
+
+        assert len(key_points) == 2
+        assert key_points[0].description == "Point A [Data: Reports (1, 2)]"
+        assert key_points[0].score == 90
+        assert key_points[1].score == 40
+
     @patch('graphrag_anthropic_llamaindex.global_search.map_processor.get_configured_llm')
     def test_extract_key_points_text_format(self, mock_configured_llm, mock_llm_config):
         """テキスト形式のレスポンスからの抽出をテスト"""

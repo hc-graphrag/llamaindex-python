@@ -32,8 +32,11 @@ def _resolve_relative_paths(config, config_dir):
         if isinstance(value, dict):
             resolved_config[key] = _resolve_relative_paths(value, config_dir)
         elif isinstance(value, str) and _is_relative_path_key(key):
+            # URL（AlopexDB サーバ等）はパスとして解決せずそのまま使う
+            if value.startswith(('http://', 'https://')):
+                resolved_config[key] = value
             # Resolve relative paths
-            if value.startswith('./') or not os.path.isabs(value):
+            elif value.startswith('./') or not os.path.isabs(value):
                 resolved_path = config_dir / value
                 resolved_config[key] = str(resolved_path.resolve())
             else:

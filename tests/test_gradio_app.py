@@ -69,6 +69,7 @@ def test_initialize_config_claude_code_needs_no_api_key(tmp_path, monkeypatch):
         "llm_provider: claude_code\nclaude_code:\n  model: sonnet\noutput_dir: ./out\ninput_dir: ./in\n"
     )
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("GRAPHRAG_CONFIG_BASE", str(tmp_path))
     monkeypatch.setattr(Settings, "_llm", None, raising=False)
     monkeypatch.setattr(Settings, "_embed_model", None, raising=False)
     monkeypatch.setattr(Settings, "_node_parser", None, raising=False)
@@ -81,6 +82,20 @@ def test_initialize_config_claude_code_needs_no_api_key(tmp_path, monkeypatch):
     assert status.startswith("✅"), status
     assert isinstance(Settings._llm, ClaudeCodeLLM)
     assert Settings._llm.model == "sonnet"
+
+
+def test_initialize_config_rejects_path_outside_base(tmp_path, monkeypatch):
+    base = tmp_path / "base"
+    base.mkdir()
+    outside = tmp_path / "outside.yaml"
+    outside.write_text("llm_provider: claude_code\n")
+    monkeypatch.setenv("GRAPHRAG_CONFIG_BASE", str(base))
+
+    app = gradio_app.GraphRAGApp()
+    status = app.initialize_config(str(outside))
+
+    assert status.startswith("❌"), status
+    assert app.config is None
 
 
 def test_chat_round_trip_through_running_server(chat_app):

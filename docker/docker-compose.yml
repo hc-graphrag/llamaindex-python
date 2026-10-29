@@ -66,7 +66,9 @@ services:
         APP_GID: ${HOST_GID:-1000}
     container_name: graphrag-anthropic-app
     ports:
-      - "7860:7860"
+      # ホスト側はループバックに限定（認証なしUIをLAN/公開IPに晒さない）。
+      # 外部公開が必要な場合は GRADIO_AUTH を設定した上で "0.0.0.0:7860:7860" に変更する。
+      - "127.0.0.1:7860:7860"
     volumes:
       # Mount local directories to container
       - ../data:/app/data:ro                    # 入力ドキュメント（読み取り専用）
