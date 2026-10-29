@@ -27,6 +27,8 @@ os.environ["ANTHROPIC_API_KEY"] = "test-key"
 try:
     from graphrag_anthropic_llamaindex.document_processor import add_documents
     from graphrag_anthropic_llamaindex.vector_store_manager import get_vector_store, get_index
+    from graphrag_anthropic_llamaindex.alopex_db import close_database, get_database_path
+    from graphrag_anthropic_llamaindex.db_manager import load_entities_db, load_relationships_db
     from graphrag_anthropic_llamaindex.config_manager import load_config
     from graphrag_anthropic_llamaindex.file_filter import FileFilter
     from llama_index.core import Settings
@@ -43,9 +45,9 @@ class TestIndexCreation:
     def setup_method(self):
         """各テストメソッド実行前の初期化"""
         self.test_dir = tempfile.mkdtemp(prefix="test_graphrag_")
-        self.config = self._create_test_config()
         self.test_data_dir = os.path.join(self.test_dir, "test_data")
         self.output_dir = os.path.join(self.test_dir, "output")
+        self.config = self._create_test_config()
         os.makedirs(self.test_data_dir, exist_ok=True)
         os.makedirs(self.output_dir, exist_ok=True)
         
@@ -54,6 +56,7 @@ class TestIndexCreation:
         
     def teardown_method(self):
         """各テストメソッド実行後のクリーンアップ"""
+        close_database(self.output_dir)
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir, ignore_errors=True)
     
@@ -73,14 +76,6 @@ class TestIndexCreation:
             },
             "input_dir": self.test_data_dir if hasattr(self, 'test_data_dir') else "./test_data",
             "output_dir": self.output_dir if hasattr(self, 'output_dir') else "./test_output",
-            # Consolidated vector store configuration
-            # All stores use the same LanceDB database with different tables (hardcoded)
-            "vector_store": {
-                "type": "lancedb",
-                "lancedb": {
-                    "uri": "test_lancedb"  # Single consolidated database
-                }
-            },
             "community_detection": {
                 "max_cluster_size": 5,
                 "use_lcc": True,
@@ -210,11 +205,7 @@ class TestBasicIndexCreation(TestIndexCreation):
             if vector_store is not None:
                 print(f"   ✅ {store_type}: {type(vector_store).__name__}")
                 
-                # LanceDBの場合、設定確認
-                if hasattr(vector_store, '_uri'):
-                    print(f"      URI: {vector_store._uri}")
-                if hasattr(vector_store, '_table_name'):
-                    print(f"      テーブル名: {vector_store._table_name}")
+                assert vector_store.index_name.endswith("_vectors")
             else:
                 print(f"   ❌ {store_type}: 作成失敗")
                 
@@ -222,37 +213,9 @@ class TestBasicIndexCreation(TestIndexCreation):
         """処理結果の検証"""
         print("🔍 処理結果検証開始")
         
-        # Parquetファイルの存在確認
-        expected_files = [
-            "processed_files.parquet",
-            "entities.parquet", 
-            "relationships.parquet",
-            "communities.parquet",
-            "community_summaries.parquet"
-        ]
-        
-        for filename in expected_files:
-            file_path = os.path.join(self.output_dir, filename)
-            if os.path.exists(file_path):
-                file_size = os.path.getsize(file_path)
-                print(f"   ✅ {filename}: {file_size} bytes")
-            else:
-                print(f"   ❌ {filename}: ファイルが見つかりません")
-        
-        # ベクターストアディレクトリの確認
-        vector_dirs = [
-            "test_lancedb_main",
-            "test_lancedb_entities", 
-            "test_lancedb_communities"
-        ]
-        
-        for dir_name in vector_dirs:
-            dir_path = os.path.join(self.output_dir, dir_name)
-            if os.path.exists(dir_path):
-                files = os.listdir(dir_path)
-                print(f"   ✅ {dir_name}: {len(files)} ファイル")
-            else:
-                print(f"   ❌ {dir_name}: ディレクトリが見つかりません")
+        assert os.path.isdir(get_database_path(self.output_dir))
+        print(f"   - エンティティ数: {len(load_entities_db(self.output_dir))}")
+        print(f"   - 関係性数: {len(load_relationships_db(self.output_dir))}")
 
 class TestIndexIntegrity(TestIndexCreation):
     """インデックス整合性テスト"""
@@ -288,9 +251,8 @@ class TestIndexIntegrity(TestIndexCreation):
     def _check_data_relationships(self):
         """データの関係性確認"""
         try:
-            # Parquetファイル読み込み
-            entities_df = pd.read_parquet(os.path.join(self.output_dir, "entities.parquet"))
-            relationships_df = pd.read_parquet(os.path.join(self.output_dir, "relationships.parquet"))
+            entities_df = load_entities_db(self.output_dir)
+            relationships_df = load_relationships_db(self.output_dir)
             
             print(f"📊 データ統計:")
             print(f"   - エンティティ数: {len(entities_df)}")

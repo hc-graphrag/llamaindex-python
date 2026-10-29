@@ -44,11 +44,7 @@ ignore_patterns:
   - ".env"
   - ".env.*"
 
-# ベクトルDBはマウントされた出力ディレクトリ配下に置き、コンテナを作り直しても消えないようにする
-vector_store:
-  type: "lancedb"
-  lancedb:
-    uri: "/app/graphrag_output/lancedb"
+# AlopexDB はマウント済みの /app/graphrag_output/alopexdb に永続化される
 
 community_detection:
   max_cluster_size: 10

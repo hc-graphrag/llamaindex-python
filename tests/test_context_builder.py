@@ -332,19 +332,22 @@ class TestCommunityContextBuilder:
         assert reports == []
         assert "コミュニティレポートの取得中にエラー" in caplog.text
     
-    def test_retrieve_community_reports_no_vector_store(
-        self, mock_config, caplog
+    @patch(
+        'graphrag_anthropic_llamaindex.global_search.context_builder.get_vector_store'
+    )
+    def test_init_without_vector_store_uses_embedded_store(
+        self, mock_get_vector_store, mock_config
     ):
-        """ベクターストアがない場合のテスト"""
-        builder = CommunityContextBuilder(
-            config=mock_config,
-            vector_store=None
+        """未指定時は組み込みベクターストアを自動生成する"""
+        embedded_store = Mock()
+        mock_get_vector_store.return_value = embedded_store
+
+        builder = CommunityContextBuilder(config=mock_config, vector_store=None)
+
+        assert builder.vector_store is embedded_store
+        mock_get_vector_store.assert_called_once_with(
+            mock_config, store_type="community"
         )
-        
-        reports = builder._retrieve_community_reports("test query")
-        
-        assert reports == []
-        assert "コミュニティベクターストアが設定されていません" in caplog.text
     
     @patch.object(CommunityContextBuilder, '_retrieve_community_reports')
     @patch.object(CommunityContextBuilder, '_filter_by_rank')

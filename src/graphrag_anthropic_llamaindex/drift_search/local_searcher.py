@@ -3,7 +3,6 @@
 import logging
 from typing import Any, Dict, List, Optional, Set
 
-import pandas as pd
 from llama_index.core.vector_stores.types import VectorStore, VectorStoreQuery, VectorStoreQueryMode
 
 from ..db_manager import load_entities_db, load_relationships_db
@@ -36,6 +35,7 @@ class LocalSearcher:
         self.relationship_depth = self.config.get("relationship_depth", 2)
         self.include_text_units = self.config.get("include_text_units", True)
         self.text_unit_top_k = self.config.get("text_unit_top_k", 5)
+        self.output_dir = self.config.get("output_dir", "./graphrag_output")
         
         # Cache for entities and relationships
         self._entities_cache = None
@@ -75,12 +75,6 @@ class LocalSearcher:
             # Search entity store
             result = self.entity_store.query(query_obj)
             
-            # Load entity data if not cached
-            if self._entities_cache is None:
-                # Use default output_dir from config or fallback
-                output_dir = "demo_output"  # Fixed to match demo directory
-                self._entities_cache = load_entities_db(output_dir)
-
             # Convert results to Entity objects
             entities = []
             for node in result.nodes:
@@ -98,9 +92,9 @@ class LocalSearcher:
                 if not entity_name:
                     entity_name = entity_id  # Fallback to using entity_id as name
 
-                entity_data = self._entities_cache[
-                    self._entities_cache["name"] == entity_name
-                ].to_dict("records")
+                entity_data = load_entities_db(
+                    self.output_dir, name=entity_name
+                ).to_dict("records")
                 
                 if entity_data:
                     entity_dict = entity_data[0]
@@ -139,12 +133,6 @@ class LocalSearcher:
         if not entities or max_hops <= 0:
             return entities
         
-        # Load relationships if not cached
-        if self._relationships_cache is None:
-            # Use default output_dir from config or fallback
-            output_dir = "demo_output"
-            self._relationships_cache = load_relationships_db(output_dir)
-        
         # Track visited entities to avoid cycles
         visited = {e.id for e in entities}
         expanded = entities.copy()
@@ -155,10 +143,9 @@ class LocalSearcher:
             
             for entity in current_layer:
                 # Find relationships for this entity
-                related_df = self._relationships_cache[
-                    (self._relationships_cache["source"] == entity.id) |
-                    (self._relationships_cache["target"] == entity.id)
-                ]
+                related_df = load_relationships_db(
+                    self.output_dir, entity_id=entity.id
+                )
                 
                 for _, rel in related_df.iterrows():
                     # Get the other entity in the relationship
@@ -169,21 +156,14 @@ class LocalSearcher:
                     if other_id not in visited:
                         visited.add(other_id)
                         
-                        # Load entities if not cached
-                        if self._entities_cache is None:
-                            # Use default output_dir from config or fallback
-                            output_dir = "demo_output"
-                            self._entities_cache = load_entities_db(output_dir)
-                        
-                        # Find entity data
-                        other_data = self._entities_cache[
-                            self._entities_cache["id"] == other_id
-                        ].to_dict("records")
+                        other_data = load_entities_db(
+                            self.output_dir, name=other_id
+                        ).to_dict("records")
                         
                         if other_data:
                             other_dict = other_data[0]
                             other_entity = Entity(
-                                id=other_dict.get("id", ""),
+                                id=other_dict.get("name", ""),
                                 name=other_dict.get("name", ""),
                                 type=other_dict.get("type", ""),
                                 description=other_dict.get("description", ""),

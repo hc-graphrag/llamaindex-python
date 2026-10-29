@@ -17,6 +17,7 @@ poetry.lock
 
 data
 graphrag_output
+/alopexdb/
 
 .claude
 .gemini

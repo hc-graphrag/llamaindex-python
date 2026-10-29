@@ -1,0 +1,15 @@
+http_bind = "0.0.0.0:8080"
+grpc_bind = "0.0.0.0:9090"
+admin_bind = "127.0.0.1:8081"
+data_dir = "/var/lib/alopex/data"
+api_prefix = ""
+query_timeout = "30s"
+max_concurrency = 64
+max_queue_len = 256
+max_request_size = 104857600
+max_response_size = 104857600
+session_ttl = "300s"
+metrics_enabled = true
+tracing_enabled = true
+audit_log_enabled = true
+auth_mode = { type = "none" }

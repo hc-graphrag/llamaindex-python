@@ -38,7 +38,7 @@ class TestDriftSearchEngine:
             "drift_search": {
                 "local_search": {
                     "entity_top_k": 5,
-                    "relationship_depth": 1,
+                    "relationship_depth": 0,
                 },
                 "global_search": {
                     "community_top_k": 3,
@@ -142,7 +142,7 @@ class TestLocalSearcher:
         ]
         mock_vector_stores["entity"].query.return_value = mock_result
 
-        # entities.parquet の実スキーマ (name / type / description)
+        # entities SQL dataset の実スキーマ (name / type / description)
         with patch("graphrag_anthropic_llamaindex.drift_search.local_searcher.load_entities_db") as mock_load:
             import pandas as pd
             mock_load.return_value = pd.DataFrame([
@@ -180,8 +180,7 @@ class TestLocalSearcher:
             with patch("graphrag_anthropic_llamaindex.drift_search.local_searcher.load_entities_db") as mock_ent:
                 mock_ent.return_value = pd.DataFrame([
                     {
-                        "id": "2",
-                        "name": "Entity2",
+                        "name": "2",
                         "type": "Type2",
                         "description": "Description2",
                         "attributes": {},
@@ -194,6 +193,9 @@ class TestLocalSearcher:
                 
                 assert len(expanded) == 2
                 assert any(e.id == "2" for e in expanded)
+                mock_ent.assert_called_once_with(
+                    "./graphrag_output", name="2"
+                )
 
 
 class TestGlobalSearcher:
@@ -220,7 +222,7 @@ class TestGlobalSearcher:
         ]
         mock_vector_stores["community"].query.return_value = mock_result
 
-        # community_summaries.parquet の実スキーマ (community_id / summary / key_entities)
+        # community_summaries SQL dataset の実スキーマ
         with patch("graphrag_anthropic_llamaindex.drift_search.global_searcher.load_community_summaries_db") as mock_load:
             import pandas as pd
             mock_load.return_value = pd.DataFrame([
@@ -233,7 +235,7 @@ class TestGlobalSearcher:
             
             assert len(results) == 1
             assert results[0].id == "1"
-            assert results[0].title == "Community 1"  # 要約Parquetに title 列は無い
+            assert results[0].title == "Community 1"  # 要約データに title 列は無い
             assert results[0].summary == "Test Summary"
             assert results[0].entities == ["e1", "e2"]
 

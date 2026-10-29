@@ -40,11 +40,17 @@ class DriftSearchEngine:
         # Initialize components
         self.local_searcher = LocalSearcher(
             vector_stores=vector_stores,
-            config=self.config.get("local_search", {}),
+            config={
+                **self.config.get("local_search", {}),
+                "output_dir": config.get("output_dir", "./graphrag_output"),
+            },
         )
         self.global_searcher = GlobalSearcher(
             vector_stores=vector_stores,
-            config=self.config.get("global_search", {}),
+            config={
+                **self.config.get("global_search", {}),
+                "output_dir": config.get("output_dir", "./graphrag_output"),
+            },
         )
         self.context_builder = ContextBuilder(
             config=self.config.get("context", {}),

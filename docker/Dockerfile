@@ -26,17 +26,18 @@ USER app
 
 # Copy project files
 COPY --chown=app:app pyproject.toml pdm.lock* README.md ./
-COPY --chown=app:app src/ ./src/
-COPY --chown=app:app gradio_app.py ./
 
 # Install dependencies using PDM
-RUN pdm install --prod --no-editable
+RUN pdm install --prod --no-self
+
+COPY --chown=app:app src/ ./src/
+COPY --chown=app:app gradio_app.py ./
 
 # Expose port
 EXPOSE 7860
 
 # Set environment variables
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/src:/app
 # claude_code プロバイダ: ログイン状態 (~/.claude と .claude.json) をここへ置き、bind mount で永続化する
 ENV CLAUDE_CONFIG_DIR=/home/app/.claude
 # claude-agent-sdk の wheel に同梱された CLI を PATH に通す (`claude auth login` 用)

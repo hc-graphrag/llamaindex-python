@@ -123,10 +123,6 @@ def test_config_with_global_search_section():
             "chunk_size": 512,
             "chunk_overlap": 64
         },
-        "vector_store": {
-            "type": "lancedb",
-            "uri": "./test_lancedb"
-        },
         "global_search": {
             "response_type": "Multiple Paragraphs",
             "max_tokens": 3000,
@@ -243,7 +239,6 @@ def test_cli_integration_mock():
         "anthropic": {"api_key": "test-key", "model": "claude-3-sonnet"},
         "embedding_model": {"name": "test-model"},
         "chunking": {"chunk_size": 512, "chunk_overlap": 64},
-        "vector_store": {"type": "lancedb", "uri": "./test"},
         "global_search": {"response_type": "Multiple Paragraphs"}
     }
     
@@ -267,6 +262,52 @@ def test_cli_integration_mock():
         Path(config_path).unlink()
         if "ANTHROPIC_API_KEY" in os.environ:
             del os.environ["ANTHROPIC_API_KEY"]
+
+
+def test_output_dir_override_is_used_for_all_embedded_stores():
+    """CLIの出力先上書きをSQL・全HNSWで共有する。"""
+    config = {"llm_provider": "claude_code", "output_dir": "configured-output"}
+    stores = [MagicMock(), MagicMock(), MagicMock()]
+    router = MagicMock()
+    router._retrieve.return_value = []
+
+    with patch(
+        "graphrag_anthropic_llamaindex.main.load_config", return_value=config
+    ), patch(
+        "graphrag_anthropic_llamaindex.main.get_vector_store",
+        side_effect=stores,
+    ) as mock_get_store, patch(
+        "graphrag_anthropic_llamaindex.main.ClaudeCodeLLM"
+    ), patch(
+        "graphrag_anthropic_llamaindex.main.HuggingFaceEmbedding"
+    ), patch(
+        "graphrag_anthropic_llamaindex.main.Settings"
+    ), patch(
+        "graphrag_anthropic_llamaindex.main.SearchModeRouter",
+        return_value=router,
+    ) as mock_router, patch(
+        "sys.argv",
+        [
+            "main.py",
+            "--config",
+            "test.yaml",
+            "search",
+            "query",
+            "--output-dir",
+            "override-output",
+        ],
+    ):
+        from graphrag_anthropic_llamaindex.main import main
+
+        main()
+
+    storage_config = {**config, "output_dir": "override-output"}
+    assert mock_get_store.call_args_list == [
+        ((storage_config,), {"store_type": "main"}),
+        ((storage_config,), {"store_type": "entity"}),
+        ((storage_config,), {"store_type": "community"}),
+    ]
+    assert mock_router.call_args.kwargs["config"] == storage_config
 
 def test_router_raises_when_drift_retriever_missing():
     """DRIFT が未初期化なら Global へ退避せず例外にする。"""

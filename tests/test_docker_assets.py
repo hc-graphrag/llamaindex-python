@@ -67,8 +67,8 @@ def test_container_config_uses_container_paths_and_a_usable_provider():
     assert config["output_dir"] == "/app/graphrag_output"
     # claude CLI のログインはコンテナ内に無いので claude_code は使えない
     assert config["llm_provider"] in {"anthropic", "bedrock"}
-    # ベクトルDBはマウントされた出力ディレクトリ配下に置く (コンテナ再作成で消えない)
-    assert config["vector_store"]["lancedb"]["uri"].startswith(config["output_dir"] + "/")
+    # AlopexDB は常に output_dir/alopexdb に置くため、別DB設定は持たない
+    assert "vector_store" not in config
 
 
 def test_compose_mounts_config_where_the_ui_looks_for_it():

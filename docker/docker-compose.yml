@@ -1,4 +1,61 @@
 services:
+  alopexdb:
+    profiles: ["server"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.alopex-server
+      args:
+        ALOPEX_VERSION: "0.8.16"
+    image: graphrag-alopex-server:0.8.16
+    volumes:
+      - alopex-server-data:/var/lib/alopex
+    expose:
+      - "8080"
+      - "9090"
+    restart: unless-stopped
+
+  graphrag-server:
+    profiles: ["server"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        APP_UID: ${HOST_UID:-1000}
+        APP_GID: ${HOST_GID:-1000}
+    image: graphrag-llamaindex-server:latest
+    command:
+      - pdm
+      - run
+      - uvicorn
+      - graphrag_anthropic_llamaindex.server:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    depends_on:
+      alopexdb:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - llamaindex-server-data:/app/data
+      - ./config.server.yaml:/app/config/config.yaml:ro
+      - ../claude_home:/home/app/.claude
+    environment:
+      - ALOPEX_SERVER_URL=http://alopexdb:8080
+      - ALOPEX_SERVER_INSECURE=true
+      - GRAPHRAG_CONFIG=/app/config/config.yaml
+      - ANTHROPIC_API_KEY
+      - CLAUDE_CODE_OAUTH_TOKEN
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
   graphrag-app:
     build:
       context: ..
@@ -42,3 +99,5 @@ services:
 
 volumes:
   graphrag-logs:
+  alopex-server-data:
+  llamaindex-server-data:

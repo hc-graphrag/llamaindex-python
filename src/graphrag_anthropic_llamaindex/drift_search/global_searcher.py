@@ -3,7 +3,6 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-import pandas as pd
 from llama_index.core.vector_stores.types import VectorStore, VectorStoreQuery, VectorStoreQueryMode
 
 from ..db_manager import load_community_summaries_db
@@ -34,6 +33,7 @@ class GlobalSearcher:
         self.community_top_k = self.config.get("community_top_k", 5)
         self.include_summaries = self.config.get("include_summaries", True)
         self.max_summary_length = self.config.get("max_summary_length", 500)
+        self.output_dir = self.config.get("output_dir", "./graphrag_output")
         
         # Cache for communities
         self._communities_cache = None
@@ -72,12 +72,6 @@ class GlobalSearcher:
             # Search community store
             result = self.community_store.query(query_obj)
             
-            # Load community data if not cached
-            if self._communities_cache is None:
-                # Use default output_dir from config or fallback
-                output_dir = "demo_output"  # Fixed to match demo directory
-                self._communities_cache = load_community_summaries_db(output_dir)
-
             # Convert results to Community objects
             communities = []
             for node in result.nodes:
@@ -97,9 +91,9 @@ class GlobalSearcher:
                     except (ValueError, TypeError):
                         actual_community_id = 0  # Default fallback
 
-                community_data = self._communities_cache[
-                    self._communities_cache["community_id"] == actual_community_id
-                ].to_dict("records")
+                community_data = load_community_summaries_db(
+                    self.output_dir, community_id=actual_community_id
+                ).to_dict("records")
                 
                 if community_data:
                     community_dict = community_data[0]

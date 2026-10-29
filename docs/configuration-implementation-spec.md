@@ -63,16 +63,7 @@ ignore_patterns:
   - "*.log"
   - ".git/*"
 
-# ベクトルストア設定
-# 全てのベクトルストアは単一のLanceDBデータベースに統合され、
-# ストアタイプごとに異なるテーブル（ハードコーディング）を使用:
-# - メイン: "vectors" テーブル
-# - エンティティ: "entities_vectors" テーブル
-# - コミュニティ: "community_vectors" テーブル
-vector_store:
-  type: "lancedb"
-  lancedb:
-    uri: "./graphrag_output/lancedb"  # 全ストア共通の統合データベース
+# SQLデータと3種類のHNSWインデックスは output_dir/alopexdb に自動保存される
 
 # コミュニティ検出設定
 community_detection:
@@ -155,24 +146,15 @@ chunk_size = chunking_config.get("chunk_size", 1024)
 chunk_overlap = chunking_config.get("chunk_overlap", 20)
 ```
 
-### 3. ベクトルストア設定の読み込み
+### 3. AlopexDBベクトルストアの作成
 
 ```python
 def get_vector_store(config, store_type="main"):
-    """設定からベクトルストアを取得"""
-    if store_type == "main":
-        store_config = config.get("vector_store", {})
-    elif store_type == "community":
-        store_config = config.get("community_vector_store", {})
-    elif store_type == "entity":
-        store_config = config.get("entity_vector_store", {})
-    
-    # LanceDB設定の取得
-    if store_config.get("type") == "lancedb":
-        lancedb_config = store_config.get("lancedb", {})
-        uri = lancedb_config.get("uri")
-        table_name = lancedb_config.get("table_name")
-        # ベクトルストアの初期化...
+    """共有AlopexDB内の名前付きHNSWインデックスを取得"""
+    index_name = VECTOR_STORE_INDEX_NAMES.get(store_type)
+    if index_name is None:
+        return None
+    return AlopexVectorStore(config.get("output_dir", "./graphrag_output"), index_name)
 ```
 
 ## バリデーション

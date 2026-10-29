@@ -122,12 +122,12 @@ print_info "Output directory resolved to: $OUTPUT_DIR"
 
 # Check if demo output already exists
 SKIP_INDEXING=false
-if [ -d "$OUTPUT_DIR" ] && [ -f "$OUTPUT_DIR/entities.parquet" ] && [ -f "$OUTPUT_DIR/relationships.parquet" ]; then
+if [ -d "$OUTPUT_DIR/alopexdb" ]; then
     print_info "Existing demo output found. Checking if indexing can be skipped..."
 
     # Check if the output contains valid data
-    ENTITY_COUNT=$(python -c "import pandas as pd; try: print(len(pd.read_parquet('$OUTPUT_DIR/entities.parquet'))); except: print(0)" 2>/dev/null || echo "0")
-    REL_COUNT=$(python -c "import pandas as pd; try: print(len(pd.read_parquet('$OUTPUT_DIR/relationships.parquet'))); except: print(0)" 2>/dev/null || echo "0")
+    ENTITY_COUNT=$(python -c "from graphrag_anthropic_llamaindex.db_manager import load_entities_db; print(len(load_entities_db('$OUTPUT_DIR')))" 2>/dev/null || echo "0")
+    REL_COUNT=$(python -c "from graphrag_anthropic_llamaindex.db_manager import load_relationships_db; print(len(load_relationships_db('$OUTPUT_DIR')))" 2>/dev/null || echo "0")
 
     if [ "$ENTITY_COUNT" -gt 0 ] && [ "$REL_COUNT" -gt 0 ]; then
         print_info "Valid index found with $ENTITY_COUNT entities and $REL_COUNT relationships"
@@ -169,16 +169,12 @@ fi
 # Display graph statistics
 print_step 3 "Knowledge graph statistics:"
 echo ""
-if [ -f "$OUTPUT_DIR/entities.parquet" ]; then
-    ENTITY_COUNT=$(python -c "import pandas as pd; print(len(pd.read_parquet('$OUTPUT_DIR/entities.parquet')))")
+if [ -d "$OUTPUT_DIR/alopexdb" ]; then
+    ENTITY_COUNT=$(python -c "from graphrag_anthropic_llamaindex.db_manager import load_entities_db; print(len(load_entities_db('$OUTPUT_DIR')))")
     echo "  • Entities extracted: $ENTITY_COUNT"
-fi
-if [ -f "$OUTPUT_DIR/relationships.parquet" ]; then
-    REL_COUNT=$(python -c "import pandas as pd; print(len(pd.read_parquet('$OUTPUT_DIR/relationships.parquet')))")
+    REL_COUNT=$(python -c "from graphrag_anthropic_llamaindex.db_manager import load_relationships_db; print(len(load_relationships_db('$OUTPUT_DIR')))")
     echo "  • Relationships found: $REL_COUNT"
-fi
-if [ -f "$OUTPUT_DIR/community_summaries.parquet" ]; then
-    COMM_COUNT=$(python -c "import pandas as pd; print(len(pd.read_parquet('$OUTPUT_DIR/community_summaries.parquet')))")
+    COMM_COUNT=$(python -c "from graphrag_anthropic_llamaindex.db_manager import load_community_summaries_db; print(len(load_community_summaries_db('$OUTPUT_DIR')))")
     echo "  • Communities detected: $COMM_COUNT"
 fi
 echo ""

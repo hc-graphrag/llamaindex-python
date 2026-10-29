@@ -86,9 +86,10 @@ def main():
     else:
         output_dir = config.get("output_dir", "./graphrag_output")
 
-    main_vector_store = get_vector_store(config, store_type="main")
-    entity_vector_store = get_vector_store(config, store_type="entity")
-    community_vector_store = get_vector_store(config, store_type="community")
+    storage_config = {**config, "output_dir": output_dir}
+    main_vector_store = get_vector_store(storage_config, store_type="main")
+    entity_vector_store = get_vector_store(storage_config, store_type="entity")
+    community_vector_store = get_vector_store(storage_config, store_type="community")
 
     llm_params = {"model": model_name}
     if api_base_url:
@@ -155,7 +156,7 @@ def main():
 
         # Use the new SearchModeRouter for unified search interface
         router = SearchModeRouter(
-            config=config,
+            config=storage_config,
             mode=mode,
             vector_store_main=main_vector_store,
             vector_store_entity=entity_vector_store,

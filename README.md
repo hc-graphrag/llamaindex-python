@@ -11,12 +11,12 @@
 *   **重複排除:** ファイル内容のハッシュ値に基づき、一度処理したファイルの重複追加を防止。
 *   **テキストチャンキング:** ドキュメントをチャンクに分割し、ベクトル検索の粒度を調整（チャンクサイズとオーバーラップを設定可能）。
 *   **エンティティ・リレーションシップ抽出:** LLM（Anthropic Claude）を使用してテキストチャンクからエンティティ（人、組織、場所、概念など）とその関連性を抽出。
-*   **データ永続化:** 抽出されたエンティティ、リレーションシップ、処理済みファイル情報、コミュニティ、コミュニティ要約をParquet形式で保存。
+*   **データ永続化:** SQLデータとベクトルインデックスを、同じ組み込みAlopexDBへ保存。外部DBサーバーは不要。
 *   **コミュニティ検出:** 抽出されたリレーションシップからグラフを構築し、Leiden法を用いてコミュニティを検出。
 *   **コミュニティ要約:** 検出されたコミュニティの内容をLLMで要約し、キーエンティティを抽出。
 *   **ベクトル検索:**
     *   メインテキストチャンク、抽出されたエンティティ、コミュニティ要約のそれぞれに対してベクトルインデックスを作成。
-    *   LanceDB をベクトルストアとして利用（設定で切り替え可能）。
+    *   AlopexDBの名前付きHNSWインデックスを利用。
     *   HuggingFace の `intfloat/multilingual-e5-small` を埋め込みモデルとして使用。
 *   **CLIインターフェース:** ドキュメントの追加 (`add`) と検索 (`search`) をコマンドラインから実行可能。
 *   **柔軟な設定:** YAMLファイルを通じて、APIキー、モデル名、入出力ディレクトリ、チャンキング設定、コミュニティ検出パラメータなどを詳細に設定可能。
@@ -35,15 +35,7 @@ graphrag-anthropic-llamaindex/
 │   ├── sample_data.csv
 │   └── ...
 ├── graphrag_output/          # 処理結果が保存されるルートディレクトリ (output_dir)
-│   ├── processed_files.parquet
-│   ├── entities.parquet
-│   ├── relationships.parquet
-│   ├── communities.parquet
-│   ├── community_summaries.parquet
-│   ├── lancedb_main/         # メインテキストチャンクのLanceDBベクトルストア
-│   ├── lancedb_entities/     # エンティティのLanceDBベクトルストア
-│   ├── lancedb_communities/  # コミュニティ要約のLanceDBベクトルストア
-│   └── storage/              # デフォルトのLlamaIndexストレージ（LanceDBを使用しない場合）
+│   └── alopexdb/             # SQLデータとmain/entity/community HNSWインデックス
 ├── scripts/
 │   └── demo.sh               # 機能紹介デモスクリプト
 └── src/
@@ -51,7 +43,9 @@ graphrag-anthropic-llamaindex/
         ├── __init__.py
         ├── main.py           # CLIエントリポイント
         ├── config_manager.py # 設定ファイルの読み込み
-        ├── db_manager.py     # Parquetデータベースの読み書き
+        ├── alopex_db.py      # 組み込みAlopexDBの接続とスキーマ
+        ├── db_manager.py     # AlopexDB SQLデータの読み書き
+        ├── alopex_vector_store.py # LlamaIndex用HNSWアダプター
         ├── vector_store_manager.py # ベクトルストアとインデックスの管理
         ├── graph_operations.py # グラフ操作とコミュニティ検出
         ├── llm_utils.py      # LLMからのJSON出力パースとプロンプトテンプレート
@@ -111,8 +105,7 @@ cp config/config.example.yaml config/config.yaml
 *   `anthropic.model`: 使用するClaudeモデル名（例: `claude-3-opus-20240229`）。
 *   `embedding_model.name`: 埋め込みモデル名（デフォルト: `intfloat/multilingual-e5-small`）。
 *   `input_dir`: 処理対象のドキュメントが置かれるディレクトリ（デフォルト: `./data`）。
-*   `output_dir`: 処理結果（Parquetファイル、LanceDBデータ、LlamaIndexストレージ）が保存されるルートディレクトリ（デフォルト: `./graphrag_output`）。
-*   `vector_store`, `entity_vector_store`, `community_vector_store`: LanceDB の設定。`uri` は `output_dir` からの相対パスで指定します（例: `lancedb_main` は `./graphrag_output/lancedb_main` に保存されます）。`table_name` はテーブル名です。
+*   `output_dir`: 組み込みAlopexDBが保存されるルートディレクトリ（デフォルト: `./graphrag_output`）。DB本体はその直下の `alopexdb/` に作られます。
 
 ## 使用方法
 
@@ -125,9 +118,32 @@ pdm run python -m graphrag_anthropic_llamaindex.main --config config/config.yaml
 ```
 
 *   このコマンドは、`input_dir` 内の新しいドキュメントを読み込み、テキスト抽出、チャンキング、エンティティ・リレーションシップ抽出、コミュニティ検出、コミュニティ要約を行います。
-*   処理済みファイル情報、抽出されたデータは `output_dir` で指定されたディレクトリにParquetファイルとして保存されます。
+*   処理済みファイル情報、抽出データ、3種類のベクトルインデックスは同じ組み込みAlopexDBへ保存されます。
 *   メインテキスト、エンティティ、コミュニティ要約のベクトルインデックスが更新されます。
 *   初回実行時や新しいドキュメントが追加された場合、LLMの呼び出しや埋め込みモデルのダウンロードにより時間がかかることがあります。
+
+### サーバー構成
+
+サーバー構成は、AlopexDBとLlamaIndex APIを別コンテナで起動し、Docker Composeの内部ネットワークで接続します。クライアントはLlamaIndex APIだけを呼び出します。
+
+```text
+クライアント → http://127.0.0.1:8000 → LlamaIndex API → http://alopexdb:8080 → AlopexDB
+```
+
+```bash
+make server-build
+make server-up
+make server-test
+```
+
+独立クライアントの使用例:
+
+```bash
+pdm run python -m graphrag_anthropic_llamaindex.server_client health
+pdm run python -m graphrag_anthropic_llamaindex.server_client add ./data/example.txt
+pdm run python -m graphrag_anthropic_llamaindex.server_client search "検索内容" --mode global
+```
+
 
 ### 2. 検索
 

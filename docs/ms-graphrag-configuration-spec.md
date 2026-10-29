@@ -106,25 +106,12 @@ chunks:
   chunk_size_includes_metadata: false  # メタデータをサイズに含めるか
 ```
 
-### 4. vector_store（ベクトルストア設定）
+### 4. ベクトルストア
 
-ベクトルデータベースの設定を定義します。複数のストアを定義可能です。
+この実装ではベクトルストアを設定で切り替えません。SQLデータと main / entity / community のHNSWインデックスは、すべて `output_dir/alopexdb` の組み込みAlopexDBへ保存されます。
 
 ```yaml
-vector_store:
-  default_vector_store:
-    type: lancedb  # lancedb | azure_ai_search
-    
-    # LanceDB使用時
-    db_uri: ./lancedb  # データベースパス
-    container_name: my_collection
-    overwrite: true  # 既存データの上書き
-    
-    # Azure AI Search使用時
-    # type: azure_ai_search
-    # url: ${AZURE_AI_SEARCH_URL_ENDPOINT}
-    # api_key: ${AZURE_AI_SEARCH_API_KEY}
-    # container_name: my_index
+output_dir: ./graphrag_output
 ```
 
 ### 5. output（出力設定）
@@ -363,4 +350,4 @@ graphrag query --root ./project_dir --method local --query "質問内容"
 2. **パスの解決**: 相対パスは`root_dir`からの相対パスとして解決されます
 3. **Azure OpenAI**: Azure OpenAI使用時は、`api_base`、`api_version`、`deployment_name`の設定が必要です
 4. **認証**: Azure Managed Identity使用時は、`auth_type: azure_managed_identity`を設定し、`az login`でログインが必要です
-5. **ベクトルストア**: LanceDB使用時は`db_uri`が必須、Azure AI Search使用時は`url`と`api_key`が必須です
+5. **ベクトルストア**: AlopexDBは`output_dir/alopexdb`へ自動作成され、外部DB設定は不要です

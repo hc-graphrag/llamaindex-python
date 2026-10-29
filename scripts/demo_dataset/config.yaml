@@ -17,24 +17,6 @@ chunking:
 input_dir: "./data"
 output_dir: "./demo_output"
 
-vector_store:
-  type: "lancedb"
-  lancedb:
-    uri: "./demo_output/lancedb_main"
-    table_name: "vectors"
-
-community_vector_store:
-  type: "lancedb"
-  lancedb:
-    uri: "./demo_output/lancedb_main"
-    table_name: "community_vectors"
-
-entity_vector_store:
-  type: "lancedb"
-  lancedb:
-    uri: "./demo_output/lancedb_main"
-    table_name: "entities_vectors"
-
 community_detection:
   algorithm: "leiden"
   resolution: 1.0

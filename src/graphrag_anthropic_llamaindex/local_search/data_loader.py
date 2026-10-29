@@ -1,28 +1,25 @@
-"""Data loader for local search - loads entities and relationships from storage."""
+"""Load local-search entities and relationships from AlopexDB SQL."""
 
-import os
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import pandas as pd
 
-from ..db_manager import load_entities_db, load_relationships_db
+from ..db_manager import load_entities_db, load_relationships_db, load_text_units_db
 from .models import Entity, Relationship, TextUnit
 
 logger = logging.getLogger(__name__)
 
 
-def load_entities_from_parquet(output_dir: str) -> List[Entity]:
-    """
-    Load entities from Parquet file and convert to Entity objects.
+def load_entities(output_dir: str) -> List[Entity]:
+    """Load entities from AlopexDB and convert them to model objects.
     
     Args:
-        output_dir: Directory containing the Parquet files
+        output_dir: Directory containing the embedded AlopexDB
         
     Returns:
         List of Entity objects
     """
     try:
-        # Load DataFrame from Parquet
         df = load_entities_db(output_dir)
         
         if df.empty:
@@ -57,18 +54,16 @@ def load_entities_from_parquet(output_dir: str) -> List[Entity]:
         return []
 
 
-def load_relationships_from_parquet(output_dir: str) -> List[Relationship]:
-    """
-    Load relationships from Parquet file and convert to Relationship objects.
+def load_relationships(output_dir: str) -> List[Relationship]:
+    """Load relationships from AlopexDB and convert them to model objects.
     
     Args:
-        output_dir: Directory containing the Parquet files
+        output_dir: Directory containing the embedded AlopexDB
         
     Returns:
         List of Relationship objects
     """
     try:
-        # Load DataFrame from Parquet
         df = load_relationships_db(output_dir)
         
         if df.empty:
@@ -105,25 +100,17 @@ def load_relationships_from_parquet(output_dir: str) -> List[Relationship]:
         return []
 
 
-def load_text_units_from_parquet(output_dir: str) -> List[TextUnit]:
-    """
-    Load text units from Parquet file if available.
+def load_text_units(output_dir: str) -> List[TextUnit]:
+    """Load text units from AlopexDB.
     
     Args:
-        output_dir: Directory containing the Parquet files
+        output_dir: Directory containing the embedded AlopexDB
         
     Returns:
         List of TextUnit objects
     """
     try:
-        # Check if text units file exists
-        text_units_path = os.path.join(output_dir, 'text_units.parquet')
-        if not os.path.exists(text_units_path):
-            logger.info(f"No text units file found at {text_units_path}")
-            return []
-        
-        # Load DataFrame from Parquet
-        df = pd.read_parquet(text_units_path)
+        df = load_text_units_db(output_dir)
         
         if df.empty:
             logger.warning(f"No text units found in {output_dir}")
@@ -178,9 +165,9 @@ def load_all_data(config: Dict[str, Any]) -> Dict[str, Any]:
     output_dir = config.get('output_dir', '.')
     
     data = {
-        'entities': load_entities_from_parquet(output_dir),
-        'relationships': load_relationships_from_parquet(output_dir),
-        'text_units': load_text_units_from_parquet(output_dir)
+        'entities': load_entities(output_dir),
+        'relationships': load_relationships(output_dir),
+        'text_units': load_text_units(output_dir)
     }
     
     logger.info(

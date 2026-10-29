@@ -1,7 +1,7 @@
 # GraphRAG Anthropic LlamaIndex Makefile
 # Docker環境での開発・運用を簡単にするためのコマンド集
 
-.PHONY: help build up down restart logs status clean setup dev test claude-login claude-status
+.PHONY: help build up down restart logs status clean setup dev test claude-login claude-status server-build server-up server-down server-logs server-test
 
 # デフォルトターゲット
 help: ## ヘルプを表示
@@ -94,6 +94,22 @@ test: ## アプリの動作確認
 health: ## ヘルスチェック実行
 	@echo "🏥 ヘルスチェック実行中..."
 	@docker compose -f $(COMPOSE_FILE) exec $(SERVICE_NAME) curl -fsS -o /dev/null http://localhost:7860/ && echo "✅ ヘルスチェック成功" || echo "❌ ヘルスチェック失敗"
+
+server-build: ## AlopexDB + LlamaIndexサーバーをビルド
+	@docker compose -f $(COMPOSE_FILE) --profile server build alopexdb graphrag-server
+
+server-up: ## AlopexDB + LlamaIndexサーバーを起動
+	@docker compose -f $(COMPOSE_FILE) --profile server up -d alopexdb graphrag-server
+
+server-down: ## AlopexDB + LlamaIndexサーバーを停止
+	@docker compose -f $(COMPOSE_FILE) --profile server stop graphrag-server alopexdb
+
+server-logs: ## AlopexDB + LlamaIndexサーバーのログを表示
+	@docker compose -f $(COMPOSE_FILE) --profile server logs -f alopexdb graphrag-server
+
+server-test: ## LlamaIndex APIからAlopexDBへの接続を確認
+	@pdm run python -m graphrag_anthropic_llamaindex.server_client health
+	@docker compose -f $(COMPOSE_FILE) --profile server exec -T graphrag-server pdm run python -m graphrag_anthropic_llamaindex.server_smoke
 
 # クリーンアップ
 clean: ## コンテナ・イメージ・ボリュームを削除

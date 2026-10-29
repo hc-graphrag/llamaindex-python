@@ -1,79 +1,186 @@
-import pandas as pd
-import os
-import hashlib
+"""GraphRAG structured storage backed by embedded AlopexDB SQL."""
 
-def calculate_file_hash(filepath):
-    """Calculates the SHA256 hash of a file."""
+from __future__ import annotations
+
+import hashlib
+import json
+from typing import Any
+
+import pandas as pd
+from alopex import RemoteDatabase, TxnMode
+
+from .alopex_db import get_database
+
+
+_DATASET_COLUMNS = {
+    "processed_files": ["filepath", "hash"],
+    "entities": ["name", "type"],
+    "relationships": ["source", "target", "type", "description"],
+    "communities": ["level", "cluster_id", "parent_cluster", "nodes"],
+    "community_summaries": ["community_id", "summary", "key_entities"],
+    "text_units": ["id", "text", "entity_ids"],
+}
+
+
+def calculate_file_hash(filepath: str) -> str:
+    """Calculate a file's SHA-256 hash."""
     hasher = hashlib.sha256()
-    with open(filepath, 'rb') as f:
-        while True:
-            chunk = f.read(8192)  # Read in 8KB chunks
-            if not chunk:
-                break
+    with open(filepath, "rb") as file:
+        while chunk := file.read(8192):
             hasher.update(chunk)
     return hasher.hexdigest()
 
-def load_processed_files_db(output_dir):
-    """Loads the processed files DataFrame from a Parquet file within the specified directory."""
-    db_path = os.path.join(output_dir, 'processed_files.parquet')
-    if os.path.exists(db_path):
-        return pd.read_parquet(db_path)
-    return pd.DataFrame(columns=['filepath', 'hash'])
 
-def save_processed_files_db(df, output_dir):
-    """Saves the processed files DataFrame to a Parquet file within the specified directory."""
-    os.makedirs(output_dir, exist_ok=True)
-    db_path = os.path.join(output_dir, 'processed_files.parquet')
-    df.to_parquet(db_path, index=False)
+def _json_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_value(item) for item in value]
+    if hasattr(value, "item"):
+        value = value.item()
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return str(value)
 
-def load_entities_db(output_dir):
-    """Loads the extracted entities DataFrame from a Parquet file."""
-    db_path = os.path.join(output_dir, 'entities.parquet')
-    if os.path.exists(db_path):
-        return pd.read_parquet(db_path)
-    return pd.DataFrame(columns=['name', 'type'])
 
-def save_entities_db(df, output_dir):
-    """Saves the extracted entities DataFrame to a Parquet file."""
-    os.makedirs(output_dir, exist_ok=True)
-    db_path = os.path.join(output_dir, 'entities.parquet')
-    df.to_parquet(db_path, index=False)
+def _text(value: Any) -> str | None:
+    return None if value is None else str(value)
 
-def load_relationships_db(output_dir):
-    """Loads the extracted relationships DataFrame from a Parquet file."""
-    db_path = os.path.join(output_dir, 'relationships.parquet')
-    if os.path.exists(db_path):
-        return pd.read_parquet(db_path)
-    return pd.DataFrame(columns=['source', 'target', 'type', 'description'])
 
-def save_relationships_db(df, output_dir):
-    """Saves the extracted relationships DataFrame to a Parquet file."""
-    os.makedirs(output_dir, exist_ok=True)
-    db_path = os.path.join(output_dir, 'relationships.parquet')
-    df.to_parquet(db_path, index=False)
+def _save_dataset(dataframe: pd.DataFrame, output_dir: str, dataset: str) -> None:
+    rows = []
+    for position, record in enumerate(dataframe.to_dict("records")):
+        record = _json_value(record)
+        rows.append(
+            [
+                f"{dataset}:{position}",
+                dataset,
+                position,
+                _text(record.get("id")),
+                _text(record.get("name")),
+                _text(record.get("type")),
+                _text(record.get("source")),
+                _text(record.get("target")),
+                _text(record.get("community_id")),
+                _text(record.get("filepath")),
+                _text(record.get("hash")),
+                json.dumps(record, ensure_ascii=False, separators=(",", ":")),
+            ]
+        )
 
-def load_community_db(output_dir):
-    """Loads the detected communities DataFrame from a Parquet file."""
-    db_path = os.path.join(output_dir, 'communities.parquet')
-    if os.path.exists(db_path):
-        return pd.read_parquet(db_path)
-    return pd.DataFrame(columns=['level', 'cluster_id', 'parent_cluster', 'nodes'])
+    database = get_database(output_dir)
+    with database.begin(TxnMode.READ_WRITE) as transaction:
+        transaction.execute_sql(
+            "DELETE FROM graphrag_records WHERE dataset = ?", [dataset]
+        )
+        if rows:
+            insert_sql = """
+            INSERT INTO graphrag_records (
+                row_key, dataset, position, record_id, name, record_type,
+                source, target, community_id, filepath, file_hash, payload
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            if isinstance(database, RemoteDatabase):
+                for row in rows:
+                    transaction.execute_sql(insert_sql, row)
+            else:
+                transaction.execute_many(insert_sql, rows)
+        transaction.commit()
 
-def save_community_db(df, output_dir):
-    """Saves the detected communities DataFrame to a Parquet file."""
-    os.makedirs(output_dir, exist_ok=True)
-    db_path = os.path.join(output_dir, 'communities.parquet')
-    df.to_parquet(db_path, index=False)
 
-def load_community_summaries_db(output_dir):
-    """Loads the community summaries DataFrame from a Parquet file."""
-    db_path = os.path.join(output_dir, 'community_summaries.parquet')
-    if os.path.exists(db_path):
-        return pd.read_parquet(db_path)
-    return pd.DataFrame(columns=['community_id', 'summary', 'key_entities'])
+def _load_dataset(
+    output_dir: str,
+    dataset: str,
+    condition: str | None = None,
+    params: list[Any] | None = None,
+) -> pd.DataFrame:
+    sql = "SELECT payload FROM graphrag_records WHERE dataset = ?"
+    values: list[Any] = [dataset]
+    if condition:
+        sql += f" AND ({condition})"
+        values.extend(params or [])
+    sql += " ORDER BY position"
+    records = [
+        json.loads(row["payload"])
+        for row in get_database(output_dir).execute_sql(sql, values)
+    ]
+    if records:
+        return pd.DataFrame(records)
+    return pd.DataFrame(columns=_DATASET_COLUMNS[dataset])
 
-def save_community_summaries_db(df, output_dir):
-    """Saves the community summaries DataFrame to a Parquet file."""
-    os.makedirs(output_dir, exist_ok=True)
-    db_path = os.path.join(output_dir, 'community_summaries.parquet')
-    df.to_parquet(db_path, index=False)
+
+def load_processed_files_db(output_dir: str) -> pd.DataFrame:
+    return _load_dataset(output_dir, "processed_files")
+
+
+def save_processed_files_db(dataframe: pd.DataFrame, output_dir: str) -> None:
+    _save_dataset(dataframe, output_dir, "processed_files")
+
+
+def load_entities_db(
+    output_dir: str,
+    *,
+    name: str | None = None,
+    entity_id: str | None = None,
+) -> pd.DataFrame:
+    if name is not None:
+        return _load_dataset(output_dir, "entities", "name = ?", [name])
+    if entity_id is not None:
+        return _load_dataset(output_dir, "entities", "record_id = ?", [entity_id])
+    return _load_dataset(output_dir, "entities")
+
+
+def save_entities_db(dataframe: pd.DataFrame, output_dir: str) -> None:
+    _save_dataset(dataframe, output_dir, "entities")
+
+
+def load_relationships_db(
+    output_dir: str, *, entity_id: str | None = None
+) -> pd.DataFrame:
+    if entity_id is not None:
+        return _load_dataset(
+            output_dir,
+            "relationships",
+            "source = ? OR target = ?",
+            [entity_id, entity_id],
+        )
+    return _load_dataset(output_dir, "relationships")
+
+
+def save_relationships_db(dataframe: pd.DataFrame, output_dir: str) -> None:
+    _save_dataset(dataframe, output_dir, "relationships")
+
+
+def load_community_db(output_dir: str) -> pd.DataFrame:
+    return _load_dataset(output_dir, "communities")
+
+
+def save_community_db(dataframe: pd.DataFrame, output_dir: str) -> None:
+    _save_dataset(dataframe, output_dir, "communities")
+
+
+def load_community_summaries_db(
+    output_dir: str, *, community_id: str | int | None = None
+) -> pd.DataFrame:
+    if community_id is not None:
+        return _load_dataset(
+            output_dir, "community_summaries", "community_id = ?", [str(community_id)]
+        )
+    return _load_dataset(output_dir, "community_summaries")
+
+
+def save_community_summaries_db(dataframe: pd.DataFrame, output_dir: str) -> None:
+    _save_dataset(dataframe, output_dir, "community_summaries")
+
+
+def load_text_units_db(output_dir: str) -> pd.DataFrame:
+    return _load_dataset(output_dir, "text_units")
+
+
+def save_text_units_db(dataframe: pd.DataFrame, output_dir: str) -> None:
+    _save_dataset(dataframe, output_dir, "text_units")

@@ -23,6 +23,7 @@ from graphrag_anthropic_llamaindex.db_manager import (
 from graphrag_anthropic_llamaindex.file_filter import FileFilter
 from graphrag_anthropic_llamaindex.graph_operations import cluster_graph
 from graphrag_anthropic_llamaindex.llm_utils import parse_llm_json_output, extraction_prompt_template, summary_prompt_template, _get_full_llm_response_with_continuation, require_configured_llm
+from graphrag_anthropic_llamaindex.vector_store_manager import get_vector_store
 import fsspec
 import hashlib
 from pathlib import Path
@@ -61,6 +62,11 @@ def add_documents(
 ):
     """Adds documents from the data directory to the index."""
     print(f"Adding documents from '{input_dir}'...")
+
+    store_config = {"output_dir": output_dir}
+    vector_store = vector_store or get_vector_store(store_config, "main")
+    entity_vector_store = entity_vector_store or get_vector_store(store_config, "entity")
+    community_vector_store = community_vector_store or get_vector_store(store_config, "community")
     
     # LLM設定の確認と初期化
     llm = require_configured_llm("LLMが設定されていません。main.pyでSettings.llmを設定してからadd_documentsを呼び出してください。")
@@ -161,20 +167,20 @@ def add_documents(
                 traceback.print_exc()
                 raise RuntimeError(f"Entity extraction failed for chunk {i+1}") from e
 
-        # Save extracted entities and relationships to Parquet
+        # Save extracted entities and relationships to AlopexDB SQL
         if extracted_entities_list:
             new_entities_df = pd.DataFrame(extracted_entities_list)
             existing_entities_df = load_entities_db(output_dir)
             updated_entities_df = pd.concat([existing_entities_df, new_entities_df], ignore_index=True).drop_duplicates(subset=['name', 'type'])
             save_entities_db(updated_entities_df, output_dir)
-            print(f"Saved {len(new_entities_df)} new entities to {output_dir}/entities.parquet")
+            print(f"Saved {len(new_entities_df)} new entities to AlopexDB")
 
         if extracted_relationships_list:
             new_relationships_df = pd.DataFrame(extracted_relationships_list)
             existing_relationships_df = load_relationships_db(output_dir)
             updated_relationships_df = pd.concat([existing_relationships_df, new_relationships_df], ignore_index=True).drop_duplicates()
             save_relationships_db(updated_relationships_df, output_dir)
-            print(f"Saved {len(new_relationships_df)} new relationships to {output_dir}/relationships.parquet")
+            print(f"Saved {len(new_relationships_df)} new relationships to AlopexDB")
 
         # --- Community Detection ---
         if community_detection_config:
@@ -212,7 +218,7 @@ def add_documents(
                 existing_communities_df = load_community_db(output_dir)
                 updated_communities_df = pd.concat([existing_communities_df, new_communities_df], ignore_index=True).drop_duplicates(subset=['level', 'cluster_id'])
                 save_community_db(updated_communities_df, output_dir)
-                print(f"Saved {len(new_communities_df)} new communities to {output_dir}/communities.parquet")
+                print(f"Saved {len(new_communities_df)} new communities to AlopexDB")
 
                 # --- Community Summarization ---
                 print("Generating community summaries...")
@@ -265,19 +271,13 @@ def add_documents(
                     existing_summaries_df = load_community_summaries_db(output_dir)
                     updated_summaries_df = pd.concat([existing_summaries_df, new_summaries_df], ignore_index=True).drop_duplicates(subset=['community_id'])
                     save_community_summaries_db(updated_summaries_df, output_dir)
-                    print(f"Saved {len(new_summaries_df)} new community summaries to {output_dir}/community_summaries.parquet")
+                    print(f"Saved {len(new_summaries_df)} new community summaries to AlopexDB")
 
                 # Create/Update community summary vector index
                 if community_summary_documents:
                     try:
-                        if community_vector_store:
-                            community_storage_context = StorageContext.from_defaults(vector_store=community_vector_store)
-                            community_index = VectorStoreIndex(community_summary_documents, storage_context=community_storage_context)
-                        else:
-                            community_index_dir = os.path.join(output_dir, "community_summaries_index")
-                            os.makedirs(community_index_dir, exist_ok=True)
-                            community_index = VectorStoreIndex(community_summary_documents)
-                            community_index.storage_context.persist(persist_dir=community_index_dir)
+                        community_storage_context = StorageContext.from_defaults(vector_store=community_vector_store)
+                        VectorStoreIndex(community_summary_documents, storage_context=community_storage_context)
                         print("Community summary vector index updated.")
                     except Exception as e:
                         print(f"Error creating community summary vector index: {e}")
@@ -291,12 +291,8 @@ def add_documents(
 
         # Create/Update main text index
         try:
-            if vector_store:
-                storage_context = StorageContext.from_defaults(vector_store=vector_store)
-                index = VectorStoreIndex(nodes, storage_context=storage_context)
-            else:
-                index = VectorStoreIndex(nodes)
-                index.storage_context.persist(persist_dir=output_dir)
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+            VectorStoreIndex(nodes, storage_context=storage_context)
             print("Main text index updated.")
         except Exception as e:
             print(f"Error creating main text index: {e}")
@@ -305,15 +301,8 @@ def add_documents(
         # Create/Update entity vector index
         if entity_documents:
             try:
-                if entity_vector_store:
-                    entity_storage_context = StorageContext.from_defaults(vector_store=entity_vector_store)
-                    entity_index = VectorStoreIndex(entity_documents, storage_context=entity_storage_context)
-                else:
-                    # If no specific entity_vector_store, use default storage for entities
-                    entity_index_dir = os.path.join(output_dir, "entities_index")
-                    os.makedirs(entity_index_dir, exist_ok=True)
-                    entity_index = VectorStoreIndex(entity_documents)
-                    entity_index.storage_context.persist(persist_dir=entity_index_dir)
+                entity_storage_context = StorageContext.from_defaults(vector_store=entity_vector_store)
+                VectorStoreIndex(entity_documents, storage_context=entity_storage_context)
                 print("Entity vector index updated.")
             except Exception as e:
                 print(f"Error creating entity vector index: {e}")

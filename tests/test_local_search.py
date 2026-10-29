@@ -11,8 +11,8 @@ from src.graphrag_anthropic_llamaindex.local_search.entity_mapper import EntityM
 from src.graphrag_anthropic_llamaindex.local_search.context_builder import LocalContextBuilder
 from src.graphrag_anthropic_llamaindex.local_search.retriever import LocalSearchRetriever
 from src.graphrag_anthropic_llamaindex.local_search.data_loader import (
-    load_entities_from_parquet,
-    load_relationships_from_parquet
+    load_entities,
+    load_relationships,
 )
 
 
@@ -78,11 +78,12 @@ class TestEntityMapper:
     def test_entity_mapper_initialization(self):
         """Test EntityMapper initialization."""
         config = {"output_dir": "."}
-        mapper = EntityMapper(config=config, top_k=5)
+        entity_index = Mock()
+        mapper = EntityMapper(config=config, entity_index=entity_index, top_k=5)
         
         assert mapper.config == config
         assert mapper.top_k == 5
-        assert mapper.entity_index is None  # No vector store configured
+        assert mapper.entity_index is entity_index
     
     @patch('src.graphrag_anthropic_llamaindex.local_search.entity_mapper.get_vector_store')
     @patch('src.graphrag_anthropic_llamaindex.local_search.entity_mapper.get_index')
@@ -121,7 +122,7 @@ class TestEntityMapper:
     def test_map_query_to_entities_no_index(self):
         """Test mapping with no index returns empty list."""
         config = {"output_dir": "."}
-        mapper = EntityMapper(config=config)
+        mapper = EntityMapper(config=config, entity_index=Mock())
         mapper.entity_index = None
         
         entities = mapper.map_query_to_entities("test query")
@@ -221,6 +222,8 @@ class TestLocalSearchRetriever:
         config = {"output_dir": ".", "llm": {"model": "test"}}
         retriever = LocalSearchRetriever(
             config=config,
+            entity_mapper=Mock(),
+            llm=Mock(),
             prompt_style="default",
             top_k_entities=5
         )
@@ -301,8 +304,8 @@ class TestDataLoader:
     """Test data loader functions."""
     
     @patch('src.graphrag_anthropic_llamaindex.local_search.data_loader.load_entities_db')
-    def test_load_entities_from_parquet(self, mock_load_db):
-        """Test loading entities from Parquet."""
+    def test_load_entities(self, mock_load_db):
+        """Test loading entities from AlopexDB."""
         import pandas as pd
         
         # Mock DataFrame
@@ -314,7 +317,7 @@ class TestDataLoader:
         })
         mock_load_db.return_value = df
         
-        entities = load_entities_from_parquet(".")
+        entities = load_entities(".")
         
         assert len(entities) == 2
         assert entities[0].id == '1'
@@ -323,8 +326,8 @@ class TestDataLoader:
         assert entities[1].name == 'Bob'
     
     @patch('src.graphrag_anthropic_llamaindex.local_search.data_loader.load_relationships_db')
-    def test_load_relationships_from_parquet(self, mock_load_db):
-        """Test loading relationships from Parquet."""
+    def test_load_relationships(self, mock_load_db):
+        """Test loading relationships from AlopexDB."""
         import pandas as pd
         
         # Mock DataFrame
@@ -337,7 +340,7 @@ class TestDataLoader:
         })
         mock_load_db.return_value = df
         
-        relationships = load_relationships_from_parquet(".")
+        relationships = load_relationships(".")
         
         assert len(relationships) == 2
         assert relationships[0].id == 'r1'
